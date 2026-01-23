@@ -1,2 +1,2 @@
-# stupid-simple-nvr-web
-Web interface for stupid-simple-nvr
+# simple-nvr-web
+Web interface for simple-nvr
