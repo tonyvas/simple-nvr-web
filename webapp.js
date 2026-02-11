@@ -2,6 +2,8 @@ const path = require('path')
 const http = require('http');
 const express = require('express');
 
+const Logger = require('./logger')
+
 class Webapp{
     constructor(){
         this._isRunning = false;
@@ -18,18 +20,19 @@ class Webapp{
         this.app.use(express.json());
         this.app.use('/public', express.static(path.join(__dirname, 'public')))
 
+        let reqLogger = new Logger('requests.log');
+        let webLogger = new Logger('webapp.log');
+
+        this.app.locals.webLogger = webLogger;
+
         // Log all requests
         this.app.use(async (req, res, next) => {
-            try {
-                let address = req.ip;
-                let method = req.method;
-                let url = req.url;
+            let address = req.ip;
+            let method = req.method;
+            let url = req.url;
 
-                console.log(`New request from ${address} - ${method} ${url}`);
-                next();
-            } catch (error) {
-                console.error(`Error: Failed to log request: ${error.message}`);
-            }
+            await reqLogger.logInfo(`New request from ${address} - ${method} ${url}`);
+            next();
         });
 
         this.app.use(require('./routes'));

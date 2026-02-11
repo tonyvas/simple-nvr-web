@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
+const Logger = require('./logger');
 const {Source, Recording} = require('./models/models');
 const db = require('./database/db');
 
@@ -12,6 +13,8 @@ class Indexer{
         this._isRunning = false;
         this._isUpdating = false;
         this._updateHandle = null;
+
+        this._logger = new Logger('indexer.log');
     }
 
     async start(){
@@ -27,7 +30,7 @@ class Indexer{
                 await this._update();
             }
             catch(err){
-                console.error(`Failed to update index: ${err.message}`)
+                await this._logger.logError(`Failed to update index: ${err.message}`)
             }
         }, UPDATE_INTERVAL_MS);
     }
@@ -63,13 +66,12 @@ class Indexer{
 
     async _update(){
         if (this._isUpdating){
-            return console.warn(`Warning: cannot update index: update already in progress!`);
+            await this._logger.logWarning(`Cannot update index: update already in progress!`);
+            return;
         }
 
         try {
             this._isUpdating = true;
-
-            console.log('Running full scan!');
             await this._runFullScan();
         }
         catch (err){
@@ -81,9 +83,12 @@ class Indexer{
     }
 
     async _runFullScan(){
+        await this._logger.logInfo('Starting full scan!');
+
         await this._updateSources();
 
         for (let source of await this._getSourcesFromDatabase()){
+            let start = Date.now();
             let scanDirpath = path.join(source.path, 'videos');
 
             let fsPaths = [];
@@ -110,6 +115,9 @@ class Indexer{
                     await this._deleteRecordingFromDatabase(recording);
                 }
             }
+
+            let end = Date.now();
+            await this._logger.logInfo(`Full scan for source ID=${source.id} completed in ${end-start}ms!`);
         }
     }
 
@@ -138,7 +146,7 @@ class Indexer{
      * @returns {void}
      */
     async _insertSourceIntoDatabase(source){
-        console.log(`Inserting source ${source.name}`);
+        await this._logger.logInfo(`Inserting source ${source.name}`);
         await db.query("INSERT INTO source ('name', 'path') VALUES (?, ?)", [source.name, source.path]);
     }
 
@@ -147,7 +155,7 @@ class Indexer{
      * @returns {void}
      */
     async _deleteSourceFromDatabase(source){
-        console.log(`Deleting source ${source.name}`);
+        await this._logger.logInfo(`Deleting source ${source.name}`);
         await db.query('DELETE FROM source WHERE source_id=?', [source.id]);
     }
 
@@ -170,7 +178,7 @@ class Indexer{
             recording.videoCodec, recording.audioCodec
         ]
 
-        console.log(`Inserting recording at ${recording.videoPath}`);
+        await this._logger.logInfo(`Inserting recording at ${recording.videoPath}`);
         await db.query(SQL, values);
     }
 
@@ -181,7 +189,7 @@ class Indexer{
     async _deleteRecordingFromDatabase(recording){
         const SQL = 'DELETE FROM recording WHERE recording_id=?';
 
-        console.log(`Deleting recording at ${recording.videoPath}`);
+        await this._logger.logInfo(`Deleting recording at ${recording.videoPath}`);
         await db.query(SQL, [recording.id]);
     }
 

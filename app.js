@@ -2,19 +2,22 @@
 
 require('dotenv').config();
 
+const Logger = require('./logger');
+
+let logger = new Logger('main.log');
 let webapp = require('./webapp');
 let indexer = require('./indexer');
 
 async function start(){
+    await logger.logInfo('Starting webapp!');
     await webapp.start();
-    console.log('Webapp has started!');
 
+    await logger.logInfo('Starting indexer!');
     await indexer.start();
-    console.log('Indexer has started!');
 }
 
-start().then(() => {
-    console.log('Server has started!')
-}).catch(err => {
-    console.error(`Error: could not start server: ${err.message}`)
+start().then(async () => {
+    await logger.logInfo('Server has started!')
+}).catch(async (err) => {
+    await logger.logError(`Could not start server: ${err.message}`)
 })
