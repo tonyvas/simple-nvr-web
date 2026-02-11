@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/public/css/common.css">
+    <link rel="stylesheet" href="/public/css/recording-details.css">
+
+    <title>Recording <%= recording.id %></title>
+</head>
+<body>
+    <%- include('partials/header') -%> 
+
+    <h1>Recording <%= recording.id %></h1>
+
+    <main>
+        <video src="/media/videos/<%= recording.id %>" alt="<%= recording.id %> video" controls autoplay muted></video>
+
+        <div id="controls">
+            <button <%= prev ? '':'disabled' %> onclick="gotoRecording(<%= prev ? prev.id : -1 %>)">&#60;</button>
+            
+            <select id="speed_select">
+                <option value="1">1x</option>
+                <option value="2">2x</option>
+                <option value="4">4x</option>
+                <option value="8">8x</option>
+                <option value="16">16x</option>
+                <option value="32">32x</option>
+            </select>
+
+            <button <%= next ? '':'disabled' %> onclick="gotoRecording(<%= next ? next.id : -1 %>)">&#62;</button>
+        </div>
+    </main>
+
+    <script>
+        function gotoRecording(id){
+            let url = new URL(window.location);
+            
+            if (id >= 0){
+                url.pathname = `/recordings/${id}`;
+                window.location = url;
+            }
+        }
+    </script>
+
+    <script src="/public/js/recording-details.js"></script>
+</body>
+</html>

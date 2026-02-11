@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/public/css/common.css">
+    <link rel="stylesheet" href="/public/css/source-list.css">
+
+    <title>Sources</title>
+</head>
+<body>
+    <%- include('partials/header') -%> 
+
+    <h1>Sources</h1>
+
+    <main>
+        <table>
+            <colgroup>
+                <col id="col_id">
+                <col id="col_name">
+                <col id="col_count">
+                <col id="col_actions">
+            </colgroup>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Recordings</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% for (let i in sources) { %> 
+                    <%
+                        let source = sources[i];
+                        let count = counts[i];
+                    %>
+                    <tr>
+                        <td><%= source.id %></td>
+                        <td><%= source.name %></td>
+                        <td><%= count %></td>
+                        <td><a href="/recordings?src=<%= source.id %>"><button class="action_button">Browse</button></a></td>
+                    </tr>
+                <% } %>
+            </tbody>
+        </table>
+    </main>
+</body>
+</html>

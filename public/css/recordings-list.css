@@ -1,0 +1,103 @@
+#controls{
+    display: flex;
+    width: 100%;
+
+    justify-content: space-between;
+}
+
+#camera_dropdown{
+    position: relative;
+    display: inline-block;
+}
+
+#dropdown_menu{
+    display: none;
+    position: absolute;
+
+    top: 100%;
+    left: 0;
+
+    background: white;
+    border: 1px solid black;
+
+    min-width: 150px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    z-index: 10;
+}
+
+#dropdown_menu li{
+    padding: 8px 12px;
+    cursor: pointer;
+
+    color: white;
+    background-color: #333;
+}
+
+#dropdown_menu li.selected {
+    color: white;
+    background-color: #005cbf;
+}
+
+#dropdown_menu li:hover {
+    background-color: #666;
+}
+
+#dropdown_menu li:hover.selected {
+    background-color: #007bff;
+}
+
+
+
+table{
+    border: 1px solid black;
+    text-align: center;
+}
+
+table th, table td{
+    border: 1px solid black;
+}
+
+#col_id{
+    width: 75px;
+}
+
+#col_thumb{
+    width: 150px;
+}
+
+#col_source{
+    width: 275px;
+}
+
+#col_dates{
+    width: 275px;
+}
+
+#col_duration{
+    width: 125px;
+}
+
+#col_actions{
+    width: 100px;
+}
+
+td img{
+    width: 50px;
+    height: 50px;
+}
+
+.action_button{
+    width: 100%;
+    height: 100%;
+}
+
+.date_td{
+    display: flex;
+    flex-direction: column;
+}
+
+.utc_date{
+    filter: brightness(50%);
+}

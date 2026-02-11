@@ -1,0 +1,28 @@
+table{
+    border: 1px solid black;
+    text-align: center;
+}
+
+table th, table td{
+    border: 1px solid black;
+}
+
+#col_id{
+    width: 75px;
+}
+
+#col_name{
+    width: 275px;
+}
+
+#col_count{
+    width: 150px;
+}
+
+#col_actions{
+    width: 100px;
+}
+
+.action_button{
+    width: 100%;
+}

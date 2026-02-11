@@ -1,0 +1,53 @@
+html, body{
+    background-color: #444;
+    color: white;
+
+    margin: 0;
+    padding: 0;
+}
+
+body{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+header{
+    display: flex;
+    width: 100%;
+
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+
+    background-color: #222;
+}
+
+header a{
+    padding-left: 20px;
+    padding-right: 20px;
+}
+
+header nav{
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+
+    height: 50px;
+}
+
+header a{
+    text-decoration: none;
+    color: white;
+}
+
+header a:hover{
+    text-decoration: underline;
+}
+
+main{
+    max-width: 75%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}

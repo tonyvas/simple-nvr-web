@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/public/css/common.css">
+    <link rel="stylesheet" href="/public/css/recordings-list.css">
+
+    <title>Recordings List</title>
+</head>
+<body>
+    <%- include('partials/header') -%> 
+
+    <h1>Recordings</h1>
+
+    <main>
+        <div id="controls">
+            <div>
+                <div id="filter_controls">
+                    <div id="source_dropdown">
+                        <button id="dropdown_toggle">Filter sources</button>
+                        <ul id="dropdown_menu">
+                            <% for( let source of sources ) { %>
+                                <li data-id="<%= source.id %>"><%= source.name %></li>
+                            <% } %>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div id="page_controls">
+                <button onclick="goLatestPage()">Latest</button>
+                <button <%= hasNewer ? '':'disabled' %> onclick="goPrevPage()">&#60;</button>
+                <button <%= hasOlder ? '':'disabled' %> onclick="goNextPage()">&#62;</button>
+            </div>
+        </div>
+
+        <table>
+            <colgroup>
+                <col id="col_id">
+                <col id="col_thumb">
+                <col id="col_source">
+                <col id="col_dates">
+                <col id="col_duration">
+                <col id="col_actions">
+            </colgroup>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Thumbnail</th>
+                    <th>Source</th>
+                    <th>Start Date</th>
+                    <th>Duration</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% for (let recording of recordings) { %> 
+                    <tr>
+                        <td>
+                            <%= recording.id %>
+                        </td>
+
+                        <td>
+                            <img src="/media/thumbs/<%= recording.id %>" alt="<%= recording.id %> thumbnail">
+                        </td>
+
+                        <td>
+                            <%= recording.source.name %>
+                        </td>
+
+                        <td class="date_td">
+                            <span class="local_date" title="Local Date">
+                                <%= formatDate(new Date(recording.startTS - recording.utcOffset)) %>
+                            </span>
+                            <span class="utc_date" title="UTC Date">
+                                <%= formatDate(new Date(recording.startTS)) %>
+                            </span>
+                        </td>
+
+                        <td>
+                            <%= recording.duration || '?' %>
+                        </td>
+
+                        <td>
+                            <a href="/recordings/<%= recording.id %>">
+                                <button class="action_button">View</button>
+                            </a>
+                        </td>
+                    </tr>
+                <% } %>
+            </tbody>
+        </table>
+    </main>
+
+    <script>
+        function goLatestPage(){
+            let url = new URL(window.location);
+            let params = url.searchParams;
+
+            params.delete('ntc');
+            params.delete('otc');
+
+            window.location = url;
+        }
+
+        function goNextPage(){
+            let url = new URL(window.location);
+            let params = url.searchParams;
+
+            let id = <%= recordings.length > 0 ? recordings[recordings.length-1].id : -1 %>;
+            if (id >= 0){
+                params.delete('ntc');
+                params.set('otc', id);
+
+                window.location = url;
+            }
+        }
+
+        function goPrevPage(){
+            let url = new URL(window.location);
+            let params = url.searchParams;
+
+            let id = <%= recordings.length > 0 ? recordings[0].id : -1 %>;
+            if (id >= 0){
+                params.delete('otc');
+                params.set('ntc', id);
+
+                window.location = url;
+            }
+        }
+    </script>
+
+    <script src="/public/js/recordings-list.js"></script>
+</body>
+</html>
