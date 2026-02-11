@@ -1,5 +1,6 @@
 const sqlite = require('node:sqlite');
 
+const fs = require('fs');
 const path = require('path');
 
 const DATABASE_PATH = path.join(__dirname, 'recordings.db');
@@ -23,6 +24,10 @@ class DatabaseManager{
             return statement.all(...values)
         }
     }
+}
+
+if (!fs.existsSync(DATABASE_PATH)){
+    throw new Error('Database not found, set it up with "npm run setup_db" first!');
 }
 
 module.exports = new DatabaseManager(DATABASE_PATH);
