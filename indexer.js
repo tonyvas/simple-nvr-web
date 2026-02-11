@@ -5,7 +5,7 @@ const {Source, Recording} = require('./models/models');
 const db = require('./database/db');
 
 const STORAGE_DIRPATH = process.env.STORAGE_DIRPATH;
-const UPDATE_INTERVAL_MS = 5e3;
+const UPDATE_INTERVAL_MS = 30e3;
 
 class Indexer{
     constructor(){
