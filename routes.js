@@ -9,7 +9,7 @@ router.use('/sources', require('./controllers/sources.controller'));
 router.use('/recordings', require('./controllers/recordings.controller'));
 
 router.use(async (err, req, res, next) => {
-    let logger = req.locals.webLogger;
+    let logger = req.app.locals.webLogger;
     
     if (err instanceof BadRequestError){
         await logger.logError(`Bad request: ${err.message}`);

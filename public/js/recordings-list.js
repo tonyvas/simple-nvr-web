@@ -1,28 +1,42 @@
-const dropdown = document.querySelector('#source_dropdown');
-const toggleBtn = dropdown.querySelector('#dropdown_toggle');
-const menu = dropdown.querySelector('#dropdown_menu');
-const items = menu.querySelectorAll('li');
+const sourceDropdown = document.querySelector('#source_controls');
+const sourceDropdownToggle = sourceDropdown.querySelector('#dropdown_toggle');
+const sourceDropdownMenu = sourceDropdown.querySelector('#dropdown_menu');
+const sourceDropdownMenuItems = sourceDropdownMenu.querySelectorAll('li');
+const limitDropdown = document.querySelector('#limit_select');
 
-function showDropdownMenu(){
-    const rect = toggleBtn.getBoundingClientRect();
+function loadInitialControlValues(){
+    let url = new URL(window.location);
+    let params = url.searchParams;
 
-    menu.style.position = 'absolute';
-    menu.style.top = rect.bottom + window.scrollY + 'px';
-    menu.style.left = rect.left + window.scrollX + 'px';
-    
-    menu.style.display = 'block';
-}
+    let src = params.get('src');
+    if (src){
+        let ids = src.split('-');
 
-function hideDropdownMenu(){
-    if (menu.style.display == 'block'){
-        menu.style.display = 'none';
-        updateOnFilter();
+        for (let item of sourceDropdownMenuItems){
+            let id = item.getAttribute('data-id')
+            if (ids.indexOf(id) >= 0){
+                item.classList.add('selected');
+            }
+        }
     }
+
+    let lmt = params.get('lmt');
+    if (lmt){
+        let options = limitDropdown.options;
+        for (let i = 0; i < options.length; i++){
+            if (options[i].value == lmt){
+                limitDropdown.selectedIndex = i;
+                break;
+            }
+        }
+    }
+
+    hideDropdownMenu();
 }
 
 function getSelectedSourceIds(){
     let ids = [];
-    for (let item of items){
+    for (let item of sourceDropdownMenuItems){
         if (item.classList.contains('selected')){
             ids.push(item.getAttribute('data-id'))
         }
@@ -43,14 +57,36 @@ function updateOnFilter(){
         params.set('src', ids.join('-'));
     }
 
+    let lmt = limitDropdown.options[limitDropdown.selectedIndex].value;
+    params.set('lmt', lmt);
+
     params.delete('otc');
     params.delete('ntc');
 
     window.location = url;
 }
 
-toggleBtn.addEventListener('click', () => {
-    if (menu.style.display == 'block'){
+function showDropdownMenu(){
+    const rect = sourceDropdownToggle.getBoundingClientRect();
+
+    sourceDropdownMenu.style.position = 'absolute';
+    sourceDropdownMenu.style.top = rect.bottom + window.scrollY + 'px';
+    sourceDropdownMenu.style.left = rect.left + window.scrollX + 'px';
+    
+    sourceDropdownMenu.style.display = 'block';
+}
+
+function hideDropdownMenu(){
+    if (sourceDropdownMenu.style.display == 'block'){
+        sourceDropdownMenu.style.display = 'none';
+    }
+
+    let selectedCount = getSelectedSourceIds().length;
+    sourceDropdownToggle.innerHTML = `${selectedCount == 0 ? 'All' : selectedCount} Selected`
+}
+
+sourceDropdownToggle.addEventListener('click', () => {
+    if (sourceDropdownMenu.style.display == 'block'){
         hideDropdownMenu();
     }
     else{
@@ -58,33 +94,16 @@ toggleBtn.addEventListener('click', () => {
     }
 });
 
-// Toggle selection of cameras
-items.forEach(item => {
+sourceDropdownMenuItems.forEach(item => {
     item.addEventListener('click', () => {
         item.classList.toggle('selected');
     });
 });
 
-// Close dropdown if clicking outside
 document.addEventListener('click', (e) => {
-    if (!dropdown.contains(e.target) && menu.style.display == 'block') {
+    if (!sourceDropdown.contains(e.target) && sourceDropdownMenu.style.display == 'block') {
         hideDropdownMenu();
     }
 });
 
-document.body.onload = () => {
-    let url = new URL(window.location);
-    let params = url.searchParams;
-
-    let src = params.get('src');
-    if (src){
-        let ids = src.split('-');
-
-        for (let item of items){
-            let id = item.getAttribute('data-id')
-            if (ids.indexOf(id) >= 0){
-                item.classList.add('selected');
-            }
-        }
-    }
-}
+loadInitialControlValues();

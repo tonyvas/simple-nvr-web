@@ -5,9 +5,15 @@
     justify-content: space-between;
 }
 
-#camera_dropdown{
-    position: relative;
-    display: inline-block;
+#left_controls, #right_controls{
+    display: flex;
+    gap: 20px;
+}
+
+.control_group{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
 #dropdown_menu{
@@ -48,7 +54,13 @@
     background-color: #007bff;
 }
 
+#page_controls div{
+    display: flex;
+}
 
+#page_controls button{
+    width: 100%;
+}
 
 table{
     border: 1px solid black;
@@ -81,11 +93,10 @@ table th, table td{
 
 #col_actions{
     width: 100px;
-}
 
-td img{
-    width: 50px;
-    height: 50px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 .action_button{
@@ -93,11 +104,20 @@ td img{
     height: 100%;
 }
 
-.date_td{
+.date_div{
     display: flex;
     flex-direction: column;
+    justify-content: center;
+    
+    width: 100%;
+    height: 100%;
 }
 
 .utc_date{
     filter: brightness(50%);
+}
+
+.thumb{
+    width: 100%;
+    height: auto;
 }
