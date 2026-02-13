@@ -2,37 +2,48 @@ const fs = require('fs');
 const path = require('path');
 
 const Logger = require('./logger');
-const {Source, Recording} = require('./models/models');
-const db = require('./database/db');
+const { Source, Recording } = require('./models/models');
 
-const STORAGE_DIRPATH = process.env.STORAGE_DIRPATH;
-const UPDATE_INTERVAL_MS = 30e3;
+const db = require('./database/db');
+const utils = require('./utils');
+
+const DEFAULT_SCAN_INTERVAL = 30;
+const DEFAULT_THUMB_DIRPATH = path.join(__dirname, 'thumbs');
+
+const NVR_STORAGE_DIRPATH = process.env.NVR_STORAGE_DIRPATH;
+const FULL_SCAN_INTERVAL = process.env.FULL_SCAN_INTERVAL || DEFAULT_SCAN_INTERVAL;
+const THUMB_DIRPATH = process.env.THUMB_STORAGE_DIRPATH || DEFAULT_THUMB_DIRPATH;
 
 class Indexer{
     constructor(){
-        this._isRunning = false;
-        this._isUpdating = false;
-        this._updateHandle = null;
+        this._isStarted = false;
+        this._isScanning = false;
+        this._scanHandle = null;
 
         this._logger = new Logger('indexer.log');
     }
 
     async start(){
-        try{
-            await this._update();
-        }
-        catch(err){
-            throw new Error(`Failed to update on startup: ${err.message}`);
+        if (this._isStarted){
+            throw new Error('Cannot start indexer, already running!')
         }
 
-        this._updateHandle = setInterval(async () => {
+        try{
+            this._isStarted = true;
+            await this._scan();
+        }
+        catch(err){
+            throw new Error(`Failed to scan on startup: ${err.message}`);
+        }
+
+        this._scanHandle = setInterval(async () => {
             try{
-                await this._update();
+                await this._scan();
             }
             catch(err){
-                await this._logger.logError(`Failed to update index: ${err.message}`)
+                await this._logger.logError(`Failed to scan: ${err.message}`)
             }
-        }, UPDATE_INTERVAL_MS);
+        }, FULL_SCAN_INTERVAL * 1000);
     }
 
     _parseRecordingTimestamp(name){
@@ -64,21 +75,21 @@ class Indexer{
         })
     }
 
-    async _update(){
-        if (this._isUpdating){
-            await this._logger.logWarning(`Cannot update index: update already in progress!`);
+    async _scan(){
+        if (this._isScanning){
+            await this._logger.logWarning(`Cannot scan: scan already in progress!`);
             return;
         }
 
         try {
-            this._isUpdating = true;
+            this._isScanning = true;
             await this._runFullScan();
         }
         catch (err){
             throw new Error(`Failed to run full scan: ${err.message}`);
         }
         finally{
-            this._isUpdating = false;
+            this._isScanning = false;
         }
     }
 
@@ -86,7 +97,6 @@ class Indexer{
         await this._logger.logInfo('Starting full scan!');
 
         await this._updateSources();
-
         for (let source of await this._getSourcesFromDatabase()){
             let start = Date.now();
             let scanDirpath = path.join(source.path, 'videos');
@@ -101,18 +111,25 @@ class Indexer{
             let dbRecordings = await this._getRecordingsOfSourceFromDatabase(source);
             let dbPaths = dbRecordings.map(r => r.videoPath);
 
+            let promises = [];
             for (let rpath of fsPaths){
                 if (dbPaths.indexOf(rpath) < 0){
-                    let [startMS, offsetMS] = this._parseRecordingTimestamp(path.basename(rpath));
-                    let recording = new Recording(null, source, startMS, offsetMS, rpath, null, null, null, null, null, null);
-                    
-                    await this._insertRecordingIntoDatabase(recording);
+                    promises.push(this._addRecording(source, rpath));
+                }
+
+                if (promises.length >= 50){
+                    try {
+                        await Promise.all(promises);
+                        promises = [];
+                    } catch (error) {
+                        throw new Error(`Failed to add recordings to index: ${error.message}`)
+                    }
                 }
             }
 
             for (let recording of dbRecordings){
                 if (fsPaths.indexOf(recording.videoPath) < 0){
-                    await this._deleteRecordingFromDatabase(recording);
+                    await this._removeRecording(recording);
                 }
             }
 
@@ -121,15 +138,50 @@ class Indexer{
         }
     }
 
+    async _addRecording(source, videoPath){
+        await this._logger.logInfo(`Adding recording at ${videoPath}`);
+
+        let [startMS, offsetMS] = this._parseRecordingTimestamp(path.basename(videoPath));
+        let thumbPath = path.join(THUMB_DIRPATH, source.name, `${startMS}.jpg`);
+
+        let recording = new Recording(null, source, startMS, offsetMS, videoPath, thumbPath, null, null, null, null, null);
+        
+        try {
+            recording.id = await this._insertRecordingIntoDatabase(recording);
+        } catch (error) {
+            throw new Error(`Failed to insert recording into database: ${error.message}`);
+        }
+
+        try {
+            await utils.generateThumbnail(videoPath, thumbPath);
+        } catch (error) {
+            await this._logger.logWarning(`Failed to generate thumbnail: ${error.message}`);
+        }
+    }
+
+    async _removeRecording(recording){
+        await this._logger.logInfo(`Removing recording ID=${recording.id}`);
+
+        if (recording.thumbPath){
+            try {
+                fs.unlinkSync(recording.thumbPath);
+            } catch (error) {
+                await this._logger.logWarning(`Failed to delete thumbnail at ${recording.thumbPath}`);
+            }
+        }
+
+        await this._deleteRecordingFromDatabase(recording);
+    }
+
     async _updateSources(){
-        let fsSourceNames = await this._listDirectory(STORAGE_DIRPATH);
+        let fsSourceNames = await this._listDirectory(NVR_STORAGE_DIRPATH);
 
         let dbSources = await this._getSourcesFromDatabase();
         let dbSourceNames = dbSources.map(s => s.name);
 
         for (let name of fsSourceNames){
             if (dbSourceNames.indexOf(name) < 0){
-                let source = new Source(null, name, path.join(STORAGE_DIRPATH, name));
+                let source = new Source(null, name, path.join(NVR_STORAGE_DIRPATH, name));
                 await this._insertSourceIntoDatabase(source);
             }
         }
@@ -147,7 +199,9 @@ class Indexer{
      */
     async _insertSourceIntoDatabase(source){
         await this._logger.logInfo(`Inserting source ${source.name}`);
-        await db.query("INSERT INTO source ('name', 'path') VALUES (?, ?)", [source.name, source.path]);
+        let rows = await db.query("INSERT INTO source ('name', 'path') VALUES (?, ?) RETURNING source_id", [source.name, source.path]);
+
+        return rows[0]['source_id'];
     }
 
     /**
@@ -166,20 +220,19 @@ class Indexer{
     async _insertRecordingIntoDatabase(recording){
         const SQL = `
             INSERT INTO recording (
-                source_id, start_ts, utc_offset, video_path,
-                thumb_path, duration, size, bitrate,
-                vcodec, acodec
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                source_id, start_ts, utc_offset, video_path, thumb_path,
+                duration, size, bitrate, vcodec, acodec
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING recording_id
         `;
 
         let values = [
-            recording.source.id, recording.startTS, recording.utcOffset, recording.videoPath,
-            recording.thumbPath, recording.duration, recording.size, recording.bitrate,
-            recording.videoCodec, recording.audioCodec
+            recording.source.id, recording.startTS, recording.utcOffset, recording.videoPath, recording.thumbPath,
+            recording.duration, recording.size, recording.bitrate, recording.videoCodec, recording.audioCodec
         ]
 
-        await this._logger.logInfo(`Inserting recording at ${recording.videoPath}`);
-        await db.query(SQL, values);
+        let rows = await db.query(SQL, values);
+        
+        return rows[0]['recording_id'];
     }
 
     /**
@@ -189,7 +242,6 @@ class Indexer{
     async _deleteRecordingFromDatabase(recording){
         const SQL = 'DELETE FROM recording WHERE recording_id=?';
 
-        await this._logger.logInfo(`Deleting recording at ${recording.videoPath}`);
         await db.query(SQL, [recording.id]);
     }
 

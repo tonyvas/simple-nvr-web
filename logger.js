@@ -18,6 +18,7 @@ module.exports = class Logger{
         return new Promise((resolve, reject) => {
             let line = `${new Date().toISOString()} - ${message}`;
 
+            console.log(line);
             fs.appendFile(this._filepath, line+'\n', 'utf-8', (err) => {
                 if (err){
                     reject(new Error(`Could not write to log file: ${err.message}`));
