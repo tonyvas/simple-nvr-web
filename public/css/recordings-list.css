@@ -84,6 +84,8 @@
 
 .recording_thumb{
     width: 100%;
+    min-width: 50px;
+    min-height: 50px;
 }
 
 .recording_thumb img{
@@ -113,15 +115,18 @@
     max-width: 200px;
 }
 
-.recording_info_col_dates{
-    width: 100%;
-}
-
 .recording_info_col_duration{
     min-width: 100px;
     max-width: 150px;
 }
 
+.recording_info_col_dates{
+    width: 100%;
+}
+
+.recording_info_col_actions{
+    min-width: 100px;
+}
 
 
 .recording_info_dates{
@@ -131,4 +136,8 @@
 
 .recording_info_dates .utc_date{
     filter: brightness(50%);
+}
+
+.recording_info_actions button{
+    width: 75%;
 }
