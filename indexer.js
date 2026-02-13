@@ -9,10 +9,12 @@ const utils = require('./utils');
 
 const DEFAULT_SCAN_INTERVAL = 30;
 const DEFAULT_THUMB_DIRPATH = path.join(__dirname, 'thumbs');
+const DEFAULT_THUMB_MAX_BATCH = 10;
 
 const NVR_STORAGE_DIRPATH = process.env.NVR_STORAGE_DIRPATH;
 const FULL_SCAN_INTERVAL = process.env.FULL_SCAN_INTERVAL || DEFAULT_SCAN_INTERVAL;
 const THUMB_DIRPATH = process.env.THUMB_STORAGE_DIRPATH || DEFAULT_THUMB_DIRPATH;
+const THUMB_MAX_BATCH = process.env.THUMB_MAX_BATCH || DEFAULT_THUMB_MAX_BATCH;
 
 class Indexer{
     constructor(){
@@ -117,7 +119,8 @@ class Indexer{
                     promises.push(this._addRecording(source, rpath));
                 }
 
-                if (promises.length >= 50){
+                // TODO: make better
+                if (promises.length >= THUMB_MAX_BATCH){
                     try {
                         await Promise.all(promises);
                         promises = [];
@@ -125,6 +128,13 @@ class Indexer{
                         throw new Error(`Failed to add recordings to index: ${error.message}`)
                     }
                 }
+            }
+
+            // TODO: make better
+            try {
+                await Promise.all(promises);
+            } catch (error) {
+                throw new Error(`Failed to add recordings to index: ${error.message}`)
             }
 
             for (let recording of dbRecordings){
