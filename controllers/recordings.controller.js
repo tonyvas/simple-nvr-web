@@ -2,6 +2,7 @@ const router = require('express').Router()
 
 const {BadRequestError, NotFoundError} = require('../errors');
 const service = require('../services/recordings.service');
+const {formatDate, formatTime} = require('../utils');
 
 router.get('/', async (req, res, next) => {
     try {
@@ -13,11 +14,13 @@ router.get('/', async (req, res, next) => {
         const newerThanCursorQuery = req.query.ntc;
         const afterDateQuery = req.query.adt;
         const beforeDateQuery = req.query.bdt;
+        const viewQuery = req.query.v;
         
         let sources = null;
         let limit = null;
         let cursor = null;
         let desc = true;
+        let isCardView = viewQuery && viewQuery.toLowerCase() == 'card';
 
         if (olderThanCursorQuery && newerThanCursorQuery){
             throw new BadRequestError(`Multiple cursors provided, but only one supported!`);
@@ -50,20 +53,12 @@ router.get('/', async (req, res, next) => {
         let {recordings, oldest, hasOlder, newest, hasNewer} = await service.getPaginatedRecordings(sources, cursor, limit, desc);
         let allSources = await service.getSources();
 
-        res.render('recording-list.ejs', {sources: allSources, recordings, oldest, hasOlder, newest, hasNewer, formatDate: date => {
-            function padNumber(num, digits){
-                return num.toString().padStart(digits, '0');
-            }
-
-            let year = padNumber(date.getUTCFullYear(), 4);
-            let month = padNumber(date.getUTCMonth()+1, 2);
-            let day = padNumber(date.getUTCDate(), 2);
-            let hours = padNumber(date.getUTCHours(), 2);
-            let minutes = padNumber(date.getUTCMinutes(), 2);
-            let seconds = padNumber(date.getUTCSeconds(), 2);
-        
-            return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-        }});
+        let viewFile = isCardView ? 'recording-list-card.ejs' : 'recording-list-table.ejs'
+        res.render(viewFile, {
+            formatDate, formatTime,
+            sources: allSources,
+            recordings, oldest, hasOlder, newest, hasNewer,
+        });
     } catch (err) {
         throw err;
     }

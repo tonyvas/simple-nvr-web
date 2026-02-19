@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="/public/css/common.css">
-    <link rel="stylesheet" href="/public/css/recordings-list.css">
+    <link rel="stylesheet" href="/public/css/recordings-list-table.css">
 
     <title>Recordings List</title>
 </head>
@@ -14,7 +14,7 @@
     <h1>Recordings</h1>
 
     <main>
-        <div id="controls">
+        <div id="top_controls">
             <div id="left_controls">
                 <div class="control_group" id="source_controls">
                     <label for="dropdown_toggle">Filter Sources</label>
@@ -75,10 +75,11 @@
                             <%= recording.id %>
                         </td>
 
-                        <td>
+                        <td class="thumb_td">
                             <a href="/recordings/<%= recording.id %>">
-                                <img src="/media/thumbs/<%= recording.id %>" alt="<%= recording.id %> thumbnail" class="thumb" loading="lazy">
+                                <img src="/media/thumbs/<%= recording.id %>" alt="<%= recording.id %> thumbnail" class="thumb">
                             </a>
+                            <img src="/media/thumbs/<%= recording.id %>" class="thumb_popup">
                         </td>
 
                         <td>
@@ -97,7 +98,7 @@
                         </td>
 
                         <td>
-                            <%= recording.duration || '?' %>
+                            <%= recording.duration ? formatTime(recording.duration) : '?' %>
                         </td>
 
                         <td>
@@ -109,6 +110,10 @@
                 <% } %>
             </tbody>
         </table>
+        <div id="bottom_controls">
+            <button <%= hasNewer ? '':'disabled' %> onclick="goPrevPage()">&#60;</button>
+            <button <%= hasOlder ? '':'disabled' %> onclick="goNextPage()">&#62;</button>
+        </div>
     </main>
 
     <script>

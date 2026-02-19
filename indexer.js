@@ -154,7 +154,24 @@ class Indexer{
         let [startMS, offsetMS] = this._parseRecordingTimestamp(path.basename(videoPath));
         let thumbPath = path.join(THUMB_DIRPATH, source.name, `${startMS}.jpg`);
 
-        let recording = new Recording(null, source, startMS, offsetMS, videoPath, thumbPath, null, null, null, null, null);
+        let metadata = await utils.getMetadata(videoPath);
+        
+        let bitrate = metadata.format.bit_rate;
+        let duration = Math.round(metadata.format.duration);
+        let size = metadata.format.size;
+        let audioCodec = null;
+        let videoCodec = null;
+
+        for (let stream of metadata.streams){
+            if (stream.codec_type == 'video'){
+                videoCodec = stream.codec_name;
+            }
+            else if (stream.codec_type == 'audio'){
+                audioCodec = stream.codec_name;
+            }
+        }
+
+        let recording = new Recording(null, source, startMS, offsetMS, videoPath, thumbPath, duration, size, bitrate, videoCodec, audioCodec);
         
         try {
             recording.id = await this._insertRecordingIntoDatabase(recording);
