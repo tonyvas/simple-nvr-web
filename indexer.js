@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const pLimit = require('p-limit').default;
 
 const Logger = require('./logger');
 const { Source, Recording } = require('./models/models');
@@ -7,14 +8,18 @@ const { Source, Recording } = require('./models/models');
 const db = require('./database/db');
 const utils = require('./utils');
 
-const DEFAULT_SCAN_INTERVAL = 30;
+const DEFAULT_FULL_SCAN_INTERVAL = 300;
+const DEFAULT_PART_SCAN_INTERVAL = 30;
+
 const DEFAULT_THUMB_DIRPATH = path.join(__dirname, 'thumbs');
 const DEFAULT_THUMB_MAX_BATCH = 10;
 
 const NVR_STORAGE_DIRPATH = process.env.NVR_STORAGE_DIRPATH;
-const FULL_SCAN_INTERVAL = process.env.FULL_SCAN_INTERVAL || DEFAULT_SCAN_INTERVAL;
 const THUMB_DIRPATH = process.env.THUMB_STORAGE_DIRPATH || DEFAULT_THUMB_DIRPATH;
-const THUMB_MAX_BATCH = process.env.THUMB_MAX_BATCH || DEFAULT_THUMB_MAX_BATCH;
+
+const THUMB_MAX_BATCH = Number(process.env.THUMB_MAX_BATCH || DEFAULT_THUMB_MAX_BATCH);
+const FULL_SCAN_INTERVAL = Number(process.env.FULL_SCAN_INTERVAL || DEFAULT_FULL_SCAN_INTERVAL);
+const PART_SCAN_INTERVAL = Number(process.env.PART_SCAN_INTERVAL || DEFAULT_PART_SCAN_INTERVAL);
 
 class Indexer{
     constructor(){
@@ -23,6 +28,7 @@ class Indexer{
         this._scanHandle = null;
 
         this._logger = new Logger('indexer.log');
+        this._plimit = pLimit(THUMB_MAX_BATCH);
     }
 
     async start(){
@@ -32,20 +38,43 @@ class Indexer{
 
         try{
             this._isStarted = true;
-            await this._scan();
+            await this._runFullScan();
         }
         catch(err){
             throw new Error(`Failed to scan on startup: ${err.message}`);
         }
 
+        try {
+            this._setupScanning();
+        } catch (error) {
+            throw new Error(`Failed to setup scanning: ${error.message}`);
+        }
+    }
+
+    _setupScanning(){
+        let lastFullScanTime = Date.now();
+        let lastPartScanTime = Date.now();
+
         this._scanHandle = setInterval(async () => {
             try{
-                await this._scan();
+                let now = Date.now();
+
+                if ((now - lastFullScanTime) / 1000 >= FULL_SCAN_INTERVAL){
+                    await this._logger.logInfo('Running full scan!')
+                    await this._runFullScan();
+                    lastFullScanTime = now;
+                    lastPartScanTime = now;
+                }
+                else if ((now - lastPartScanTime) / 1000 >= PART_SCAN_INTERVAL){
+                    await this._logger.logInfo('Running partial scan!')
+                    await this._runPartialScan();
+                    lastPartScanTime = now;
+                }
             }
             catch(err){
                 await this._logger.logError(`Failed to scan: ${err.message}`)
             }
-        }, FULL_SCAN_INTERVAL * 1000);
+        }, 1000);
     }
 
     _parseRecordingTimestamp(name){
@@ -71,24 +100,44 @@ class Indexer{
                     reject(err);
                 }
                 else{
-                    resolve(children);
+                    resolve(children.toSorted());
                 }
             })
         })
     }
 
-    async _scan(){
+    async _runPartialScan(){
         if (this._isScanning){
-            await this._logger.logWarning(`Cannot scan: scan already in progress!`);
-            return;
+            throw new Error('Scan already in progress!');
         }
 
-        try {
+        try{
             this._isScanning = true;
-            await this._runFullScan();
+
+            let start = Date.now();
+            for (let source of await this._getSourcesFromDatabase()){
+                let latestRecording = await this._getLatestRecording(source);
+                
+                let dateDirs = await this._listDirectory(path.join(source.path, 'videos'));
+                for (let dateDir of dateDirs.toSorted().toReversed()){
+                    let datepath = path.join(source.path, 'videos', dateDir);
+
+                    let videos = await this._listDirectory(datepath);
+                    for (let video of videos.toSorted().toReversed()){
+                        let [startMS, _] = this._parseRecordingTimestamp(video);
+                        if (startMS > latestRecording.startTS){
+                            let videoPath = path.join(datepath, video);
+                            await this._addRecording(source, videoPath);
+                        }
+                    }
+                }
+            }
+
+            let end = Date.now();
+            await this._logger.logInfo(`Partial scan completed in ${end-start}ms!`);
         }
-        catch (err){
-            throw new Error(`Failed to run full scan: ${err.message}`);
+        catch (error){
+            throw error;
         }
         finally{
             this._isScanning = false;
@@ -96,55 +145,56 @@ class Indexer{
     }
 
     async _runFullScan(){
-        await this._logger.logInfo('Starting full scan!');
+        if (this._isScanning){
+            throw new Error('Scan already in progress!');
+        }
 
-        await this._updateSources();
-        for (let source of await this._getSourcesFromDatabase()){
-            let start = Date.now();
-            let scanDirpath = path.join(source.path, 'videos');
+        try{
+            this._isScanning = true;
 
-            let fsPaths = [];
-            for (let relpath of await this._listDirectory(scanDirpath, true)){
-                if (path.basename(relpath).endsWith('.mp4')){
-                    fsPaths.push(path.resolve(scanDirpath, relpath))
-                }
-            }
+            await this._updateSources();
+            for (let source of await this._getSourcesFromDatabase()){
+                let start = Date.now();
+                let scanDirpath = path.join(source.path, 'videos');
 
-            let dbRecordings = await this._getRecordingsOfSourceFromDatabase(source);
-            let dbPaths = dbRecordings.map(r => r.videoPath);
-
-            let promises = [];
-            for (let rpath of fsPaths){
-                if (dbPaths.indexOf(rpath) < 0){
-                    promises.push(this._addRecording(source, rpath));
-                }
-
-                // TODO: make better
-                if (promises.length >= THUMB_MAX_BATCH){
-                    try {
-                        await Promise.all(promises);
-                        promises = [];
-                    } catch (error) {
-                        throw new Error(`Failed to add recordings to index: ${error.message}`)
+                let fsPaths = [];
+                for (let relpath of await this._listDirectory(scanDirpath, true)){
+                    if (path.basename(relpath).endsWith('.mp4')){
+                        fsPaths.push(path.resolve(scanDirpath, relpath))
                     }
                 }
-            }
 
-            // TODO: make better
-            try {
-                await Promise.all(promises);
-            } catch (error) {
-                throw new Error(`Failed to add recordings to index: ${error.message}`)
-            }
+                let dbRecordings = await this._getRecordingsOfSourceFromDatabase(source);
+                let dbPaths = dbRecordings.map(r => r.videoPath);
 
-            for (let recording of dbRecordings){
-                if (fsPaths.indexOf(recording.videoPath) < 0){
-                    await this._removeRecording(recording);
+                let tasks = [];
+                for (let rpath of fsPaths){
+                    if (dbPaths.indexOf(rpath) < 0){
+                        tasks.push(this._plimit(() => this._addRecording(source, rpath)));
+                    }
                 }
-            }
 
-            let end = Date.now();
-            await this._logger.logInfo(`Full scan for source ID=${source.id} completed in ${end-start}ms!`);
+                try {
+                    await Promise.all(tasks)
+                } catch (error) {
+                    throw new Error(`Failed to add recordings: ${error.message}`)
+                }
+
+                for (let recording of dbRecordings){
+                    if (fsPaths.indexOf(recording.videoPath) < 0){
+                        await this._removeRecording(recording);
+                    }
+                }
+
+                let end = Date.now();
+                await this._logger.logInfo(`Full scan for source ID=${source.id} completed in ${end-start}ms!`);
+            }
+        }
+        catch (error){
+            throw error;
+        }
+        finally{
+            this._isScanning = false;
         }
     }
 
@@ -218,6 +268,13 @@ class Indexer{
                 await this._deleteSourceFromDatabase(source);
             }
         }
+    }
+
+    async _getLatestRecording(source){
+        const SQL = 'SELECT * FROM recording WHERE source_id = ? ORDER BY start_ts DESC LIMIT 1';
+        let rows = await db.query(SQL, [source.id]);
+
+        return rows.length == 0 ? null : Recording.fromDatabaseObject(source, rows[0]);
     }
 
     /**
