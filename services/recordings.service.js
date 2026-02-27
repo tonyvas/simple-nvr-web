@@ -4,6 +4,20 @@ const {NotFoundError} = require('../errors');
 const {Source, Recording} = require('../models/models');
 const { getSourceById, getSources } = require('./sources.service');
 
+async function getRelatedRecordings(recording){
+    const SQL = 'SELECT recording_id FROM ( SELECT r.recording_id, ROW_NUMBER() OVER ( PARTITION BY source_id ORDER BY ABS((r.start_ts - r.utc_offset) - ?) ) AS rn FROM recording r WHERE r.source_id != ? ) WHERE rn = 1';
+
+    let values = [recording.startTS - recording.utcOffset, recording.source.id];
+    let rows = await db.query(SQL, values);
+
+    let recordings = [];
+    for (let row of rows){
+        recordings.push(await getRecordingById(row['recording_id']));
+    }
+
+    return recordings;
+}
+
 /**
  * @param {number} recordingId 
  * @returns {Recording|null}
@@ -116,4 +130,4 @@ async function getRecordingNeighbors(recording){
     return {next, prev};
 }
 
-module.exports = { getSourceById, getSources, getRecordingById, getPaginatedRecordings, getRecordingNeighbors };
+module.exports = { getSourceById, getSources, getRecordingById, getPaginatedRecordings, getRecordingNeighbors, getRelatedRecordings };

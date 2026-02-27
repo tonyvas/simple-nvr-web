@@ -2,6 +2,10 @@ const {exec} = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
+function round(num, decimals){
+    return Math.round(num * 10**decimals) / 10**decimals;
+}
+
 function execChildProcess(cmd){
     return new Promise((resolve, reject) => {
         exec(cmd, (err, stdout, stderr) => {
@@ -77,4 +81,31 @@ function formatTime(seconds){
     return parts.map(p => padNumber(p, 2)).join(':');
 }
 
-module.exports = { execChildProcess, mkdir, generateThumbnail, getMetadata, padNumber, formatDate, formatTime };
+function formatBitrate(bitrate){
+    if (bitrate > 1e6){
+        return `${round(bitrate/1e6, 2)} Mb/s`;
+    }
+    else if (bitrate > 1e3){
+        return `${round(bitrate/1e3, 2)} kb/s`;
+    }
+    else{
+        return `${bitrate} b/s`;
+    }
+}
+
+function formatSize(size){
+    if (size > 1e9){
+        return `${round(size/1e9, 2)} GB`;
+    }
+    else if (size > 1e6){
+        return `${round(size/1e6, 2)} MB`;
+    }
+    else if (size > 1e3){
+        return `${round(size/1e3, 2)} kB`;
+    }
+    else{
+        return `${size} B`;
+    }
+}
+
+module.exports = { execChildProcess, mkdir, generateThumbnail, getMetadata, padNumber, round, formatDate, formatTime, formatBitrate, formatSize };

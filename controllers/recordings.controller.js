@@ -2,7 +2,7 @@ const router = require('express').Router()
 
 const {BadRequestError, NotFoundError} = require('../errors');
 const service = require('../services/recordings.service');
-const {formatDate, formatTime} = require('../utils');
+const {formatDate, formatTime, formatBitrate, formatSize} = require('../utils');
 
 router.get('/', async (req, res, next) => {
     try {
@@ -70,21 +70,10 @@ router.get('/:recording_id', async (req, res, next) => {
 
         let recording = await service.getRecordingById(id);
         let {next, prev} = await service.getRecordingNeighbors(recording);
+        let related = await service.getRelatedRecordings(recording);
+        console.log(related)
 
-        res.render('recording-details', { recording, next, prev, formatDate: date => {
-            function padNumber(num, digits){
-                return num.toString().padStart(digits, '0');
-            }
-
-            let year = padNumber(date.getUTCFullYear(), 4);
-            let month = padNumber(date.getUTCMonth()+1, 2);
-            let day = padNumber(date.getUTCDate(), 2);
-            let hours = padNumber(date.getUTCHours(), 2);
-            let minutes = padNumber(date.getUTCMinutes(), 2);
-            let seconds = padNumber(date.getUTCSeconds(), 2);
-
-            return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-        }});
+        res.render('recording-details', { recording, next, prev, related, formatDate, formatTime, formatSize, formatBitrate});
     } catch (err) {
         throw err;
     }

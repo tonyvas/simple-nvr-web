@@ -14,21 +14,116 @@
     <h1>Recording <%= recording.id %></h1>
 
     <main>
-        <video src="/media/videos/<%= recording.id %>" alt="<%= recording.id %> video" controls autoplay muted></video>
+        <div id="media_container">
+            <video src="/media/videos/<%= recording.id %>" alt="<%= recording.id %> video" controls autoplay muted></video>
 
-        <div id="controls">
-            <button <%= prev ? '':'disabled' %> onclick="gotoRecording(<%= prev ? prev.id : -1 %>)">&#60;</button>
+            <div id="controls">
+                <button <%= prev ? '':'disabled' %> onclick="gotoRecording(<%= prev ? prev.id : -1 %>)">&#60;</button>
+                
+                <select id="speed_select">
+                    <option value="1">1x</option>
+                    <option value="2">2x</option>
+                    <option value="4">4x</option>
+                    <option value="8">8x</option>
+                    <option value="16">16x</option>
+                    <option value="32">32x</option>
+                </select>
+
+                <button <%= next ? '':'disabled' %> onclick="gotoRecording(<%= next ? next.id : -1 %>)">&#62;</button>
+            </div>
+        </div>
+        <div id="info_container">
+            <h2>Details</h2>
+            <table>
+                <colgroup>
+                    <col class="col_source">
+                    <col class="col_dates">
+                    <col class="col_duration">
+                    <col class="col_size">
+                    <col class="col_bitrate">
+                    <col class="col_codecs">
+                </colgroup>
+                <thead>
+                    <tr class="recording_row">
+                        <th>Source</th>
+                        <th>Start Date</th>
+                        <th>Duration</th>
+                        <th>Size</th>
+                        <th>Bitrate</th>
+                        <th>A/V Codecs</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>
+                            <%= recording.source.name %>
+                        </td>
+
+                        <td class="recording_info_dates">
+                            <span class="local_date" title="Local Date">
+                                <%= formatDate(new Date(recording.startTS - recording.utcOffset)) %>
+                            </span>
+                            <span class="utc_date" title="UTC Date">
+                                <%= formatDate(new Date(recording.startTS)) %>
+                            </span>
+                        </td>
+
+                        <td>
+                            <%= recording.duration ? formatTime(recording.duration) : '?' %>
+                        </td>
+
+                        <td>
+                            <%= recording.size ? formatSize(recording.size) : '?' %>
+                        </td>
+
+                        <td>
+                            <%= recording.bitrate ? formatBitrate(recording.bitrate) : '?' %>
+                        </td>
+
+                        <td>
+                            <%= recording.audioCodec %> / <%= recording.videoCodec %>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
             
-            <select id="speed_select">
-                <option value="1">1x</option>
-                <option value="2">2x</option>
-                <option value="4">4x</option>
-                <option value="8">8x</option>
-                <option value="16">16x</option>
-                <option value="32">32x</option>
-            </select>
-
-            <button <%= next ? '':'disabled' %> onclick="gotoRecording(<%= next ? next.id : -1 %>)">&#62;</button>
+            <h2>Related Recordings</h2>
+            <table>
+                <colgroup>
+                    <col class="col_source">
+                    <col class="col_dates">
+                    <col class="col_actions">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>Source</th>
+                        <th>Start Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% for( let r of related ) { %>
+                        <tr>
+                            <td>
+                                <%= r.source.name %>
+                            </td>
+                            <td class="recording_info_dates">
+                                <span class="local_date" title="Local Date">
+                                    <%= formatDate(new Date(r.startTS - r.utcOffset)) %>
+                                </span>
+                                <span class="utc_date" title="UTC Date">
+                                    <%= formatDate(new Date(r.startTS)) %>
+                                </span>
+                            </td>
+                            <td>
+                                <a href="/recordings/<%= r.id %>">
+                                    <button class="action_button">View</button>
+                                </a>
+                            </td>
+                        </tr>
+                    <% } %>
+                </tbody>
+            </table>
         </div>
     </main>
 
