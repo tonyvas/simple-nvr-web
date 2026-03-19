@@ -50,6 +50,20 @@ class Webapp{
             this._isRunning = true;
         })
     }
+
+    stop(){
+        return new Promise((resolve, reject) => {
+            this.server.close(err => {
+                if (err){
+                    reject(new Error(`Failed to close server: ${err.message}`))
+                }
+                else{
+                    this._isRunning = false;
+                    resolve()
+                }
+            });
+        });
+    }
 }
 
 module.exports = new Webapp();

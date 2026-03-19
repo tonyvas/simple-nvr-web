@@ -51,6 +51,13 @@ class Indexer{
         }
     }
 
+    async stop(){
+        if (this._scanHandle){
+            clearInterval(this._scanHandle);
+            this._isStarted = false;
+        }
+    }
+
     _setupScanning(){
         let lastFullScanTime = Date.now();
         let lastPartScanTime = Date.now();

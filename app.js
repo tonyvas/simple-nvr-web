@@ -16,8 +16,19 @@ async function start(){
     await indexer.start();
 }
 
+async function stop(){
+    await logger.logInfo('Stopping webapp!');
+    await webapp.stop();
+
+    await logger.logInfo('Stopping indexer!');
+    await indexer.stop();
+}
+
 start().then(async () => {
     await logger.logInfo('Server has started!')
 }).catch(async (err) => {
     await logger.logError(`Could not start server: ${err.message}`)
+
+    await stop();
+    process.exit(1);
 })
