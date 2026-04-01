@@ -1,0 +1,51 @@
+.control_item{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+
+    text-align: center;
+    background-color: #333;
+    border: 2px solid black;
+    padding: 5px;
+}
+
+.control_item h3{
+    margin: 5px;
+}
+
+/* ####################### */
+/* ### Source controls ### */
+/* ####################### */
+
+#source_select_container{
+    display: flex;
+    flex-direction: column;
+    row-gap: 5px;
+}
+
+.source_select{
+    display: flex;
+    column-gap: 5px;
+}
+
+/* ###################### */
+/* ### Limit controls ### */
+/* ###################### */
+
+#limit_controls{
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+#limit_select{
+    text-align: center;
+}
+
+/* ##################### */
+/* ### Date controls ### */
+/* ##################### */
+
+.control_item .date_time_inputs{
+    display: flex;
+    flex-direction: column;
+}

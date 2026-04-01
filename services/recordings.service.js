@@ -72,6 +72,16 @@ async function getPaginatedRecordings(sources=null, cursor=null, limit=null, old
         values.push(cursor.id);
     }
 
+    if (startDate){
+        wheres.push('(start_ts - utc_offset) >= ?');
+        values.push(startDate.getTime());
+    }
+
+    if (endDate){
+        wheres.push('(start_ts - utc_offset) <= ?');
+        values.push(endDate.getTime());
+    }
+
     limit = limit ? Math.min(limit, MAX_LIMIT) : MAX_LIMIT;
     values.push(limit + 1);
 
@@ -79,6 +89,7 @@ async function getPaginatedRecordings(sources=null, cursor=null, limit=null, old
     let where = wheres.length > 0 ? `WHERE ${wheres.join(' AND ')}` : ''
     let sql = `SELECT * FROM recording ${where} ORDER BY start_ts ${order}, recording_id ${order} LIMIT ?`;
 
+    console.log(sql, values)
     let allSources = sources || await getSources();
     let rows = await db.query(sql, values);
     let recordings = rows.map(row => {

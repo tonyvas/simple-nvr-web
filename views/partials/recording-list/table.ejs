@@ -1,0 +1,64 @@
+<table>
+    <colgroup>
+        <col id="col_id">
+        <col id="col_thumb">
+        <col id="col_source">
+        <col id="col_dates">
+        <col id="col_duration">
+        <col id="col_actions">
+    </colgroup>
+    <thead>
+        <tr class="recording_row">
+            <th>ID</th>
+            <th>Thumbnail</th>
+            <th>Source</th>
+            <th>Start Date</th>
+            <th>Duration</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        <% for (let recording of recordings) { %> 
+            <tr>
+                <td>
+                    <%= recording.id %>
+                </td>
+
+                <td class="thumb_td">
+                    <a href="/recordings/<%= recording.id %>">
+                        <img src="/media/thumbs/<%= recording.id %>" alt="<%= recording.id %> thumbnail" class="thumb">
+                    </a>
+                    <img src="/media/thumbs/<%= recording.id %>" class="thumb_popup">
+                </td>
+
+                <td>
+                    <%= recording.source.name %>
+                </td>
+
+                <td class="date_td">
+                    <div class="date_div">
+                        <span class="local_date" title="Local Date">
+                            <%= formatDate(new Date(recording.startTS - recording.utcOffset)) %>
+                        </span>
+                        <span class="utc_date" title="UTC Date">
+                            <%= formatDate(new Date(recording.startTS)) %>
+                        </span>
+                    </div>
+                </td>
+
+                <td>
+                    <%= recording.duration ? formatTime(recording.duration) : '?' %>
+                </td>
+
+                <td>
+                    <a href="/recordings/<%= recording.id %>">
+                        <button class="action_button">View</button>
+                    </a>
+                    <a href="/media/videos/<%= recording.id %>" download="<%= recording.id %>.mp4">
+                        <button class="action_button">Download</button>
+                    </a>
+                </td>
+            </tr>
+        <% } %>
+    </tbody>
+</table>

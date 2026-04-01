@@ -20,6 +20,9 @@ router.get('/', async (req, res, next) => {
         let limit = null;
         let cursor = null;
         let desc = true;
+
+        let afterDate = afterDateQuery ? new Date(Number(afterDateQuery)) : null;
+        let beforeDate = beforeDateQuery ? new Date(Number(beforeDateQuery)) : null;
         let isCardView = viewQuery && viewQuery.toLowerCase() == 'card';
 
         if (olderThanCursorQuery && newerThanCursorQuery){
@@ -50,7 +53,7 @@ router.get('/', async (req, res, next) => {
             desc = false;
         }
         
-        let {recordings, oldest, hasOlder, newest, hasNewer} = await service.getPaginatedRecordings(sources, cursor, limit, desc);
+        let {recordings, oldest, hasOlder, newest, hasNewer} = await service.getPaginatedRecordings(sources, cursor, limit, desc, afterDate, beforeDate);
         let allSources = await service.getSources();
 
         let viewFile = isCardView ? 'recording-list-card.ejs' : 'recording-list-table.ejs'

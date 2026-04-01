@@ -1,109 +1,197 @@
-const sourceDropdown = document.querySelector('#source_controls');
-const sourceDropdownToggle = sourceDropdown.querySelector('#dropdown_toggle');
-const sourceDropdownMenu = sourceDropdown.querySelector('#dropdown_menu');
-const sourceDropdownMenuItems = sourceDropdownMenu.querySelectorAll('li');
-const limitDropdown = document.querySelector('#limit_select');
+const SOURCE_PARAM = 'src';
+const LIMIT_PARAM = 'lmt';
+
+const NEWER_THAN_CURSOR_PARAM = 'ntc';
+const OLDER_THAN_CURSOR_PARAM = 'otc';
+
+const NEWER_THAN_DATE_PARAM = 'ntd';
+const OLDER_THAN_DATE_PARAM = 'otd';
+const NEWER_THAN_TIME_PARAM = 'ntt';
+const OLDER_THAN_TIME_PARAM = 'ott';
+
+const SOURCE_SEPARATOR = '-';
+const SOURCE_ID_ATTR = 'data-id';
+
+const sourceControls = document.querySelector('#source_controls');
+const limitControls = document.querySelector('#limit_controls');
+const startRangeControls = document.querySelector('#range_start_controls');
+const endRangeControls = document.querySelector('#range_end_controls');
+
+const sourceCheckboxes = sourceControls.querySelectorAll('.source_checkbox');
+const limitSelect = limitControls.querySelector('#limit_select');
+
+const startDateInput = startRangeControls.querySelector('.date_input');
+const startTimeInput = startRangeControls.querySelector('.time_input');
+const endDateInput = endRangeControls.querySelector('.date_input');
+const endTimeInput = endRangeControls.querySelector('.time_input');
+
+function goLatestPage(){
+    let url = new URL(window.location);
+    let params = url.searchParams;
+
+    params.delete(NEWER_THAN_CURSOR_PARAM);
+    params.delete(OLDER_THAN_CURSOR_PARAM);
+
+    params.delete(NEWER_THAN_DATE_PARAM);
+    params.delete(NEWER_THAN_TIME_PARAM);
+
+    params.delete(OLDER_THAN_DATE_PARAM);
+    params.delete(OLDER_THAN_TIME_PARAM);
+
+    window.location = url;
+}
+
+function goOldestPage(){
+    alert('Not implemented yet!');
+}
+
+function loadInitialSourceControls(params){
+    let src = params.get(SOURCE_PARAM);
+    if (src){
+        let ids = src.split(SOURCE_SEPARATOR);
+
+        for (let checkbox of sourceCheckboxes){
+            let id = checkbox.getAttribute(SOURCE_ID_ATTR)
+            if (ids.indexOf(id) >= 0){
+                checkbox.checked = true;
+            }
+        }
+    }
+}
+
+function loadInitialLimitControls(params){
+    let lmt = params.get(LIMIT_PARAM);
+    if (lmt){
+        let options = limitSelect.options;
+        for (let i = 0; i < options.length; i++){
+            if (options[i].value == lmt){
+                limitSelect.selectedIndex = i;
+                break;
+            }
+        }
+    }
+}
+
+function loadInitialRangeControls(params){
+    let afterDate = params.get(NEWER_THAN_DATE_PARAM);
+    let afterTime = params.get(NEWER_THAN_TIME_PARAM);
+
+    if (afterDate){
+        let date = new Date(Number(afterDate));
+        startDateInput.value = date.toISOString().split('T')[0];
+    }
+
+    if (afterTime){
+
+    }
+
+    let beforeDate = params.get(OLDER_THAN_DATE_PARAM);
+    let beforeTime = params.get(OLDER_THAN_TIME_PARAM);
+    
+    if (beforeDate){
+        let date = new Date(Number(beforeDate) - 86400 + 1);
+        endDateInput.value = date.toISOString().split('T')[0];
+    }
+
+    if (beforeTime){
+
+    }
+}
 
 function loadInitialControlValues(){
     let url = new URL(window.location);
     let params = url.searchParams;
 
-    let src = params.get('src');
-    if (src){
-        let ids = src.split('-');
-
-        for (let item of sourceDropdownMenuItems){
-            let id = item.getAttribute('data-id')
-            if (ids.indexOf(id) >= 0){
-                item.classList.add('selected');
-            }
-        }
-    }
-
-    let lmt = params.get('lmt');
-    if (lmt){
-        let options = limitDropdown.options;
-        for (let i = 0; i < options.length; i++){
-            if (options[i].value == lmt){
-                limitDropdown.selectedIndex = i;
-                break;
-            }
-        }
-    }
-
-    hideDropdownMenu();
+    loadInitialSourceControls(params);
+    loadInitialLimitControls(params);
+    // loadInitialRangeControls(params);
 }
 
 function getSelectedSourceIds(){
     let ids = [];
-    for (let item of sourceDropdownMenuItems){
-        if (item.classList.contains('selected')){
-            ids.push(item.getAttribute('data-id'))
+    for (let checkbox of sourceCheckboxes){
+        if (checkbox.checked){
+            ids.push(checkbox.getAttribute(SOURCE_ID_ATTR))
         }
     }
 
     return ids;
 }
 
+function updateSourceParams(params){
+    let ids = getSelectedSourceIds();
+    if (ids.length == 0){
+        params.delete(SOURCE_PARAM);
+    }
+    else{
+        params.set(SOURCE_PARAM, ids.join(SOURCE_SEPARATOR));
+    }
+}
+
+function updateLimitParams(params){
+    let lmt = limitSelect.options[limitSelect.selectedIndex].value;
+    params.set(LIMIT_PARAM, lmt);
+}
+
+function updateRangeParams(params){
+    if (startDateInput.value){
+        let date = new Date(startDateInput.value);
+
+        params.set(NEWER_THAN_DATE_PARAM, date.getTime());
+    }
+    else{
+        params.delete(NEWER_THAN_DATE_PARAM);
+    }
+
+    if (endDateInput.value){
+        let date = new Date(endDateInput.value);
+        date.setDate(date.getDate() + 1);
+        date.setSeconds(date.getSeconds() - 1);
+
+        params.set(OLDER_THAN_DATE_PARAM, date.getTime());
+    }
+    else{
+        params.delete(OLDER_THAN_DATE_PARAM);
+    }
+}
+
 function updateOnFilter(){
     let url = new URL(window.location);
     let params = url.searchParams;
 
-    let ids = getSelectedSourceIds();
-    if (ids.length == 0){
-        params.delete('src');
-    }
-    else{
-        params.set('src', ids.join('-'));
-    }
-
-    let lmt = limitDropdown.options[limitDropdown.selectedIndex].value;
-    params.set('lmt', lmt);
-
-    params.delete('otc');
-    params.delete('ntc');
+    updateSourceParams(params);    
+    updateLimitParams(params);
+    // updateRangeParams(params);
 
     window.location = url;
 }
 
-function showDropdownMenu(){
-    const rect = sourceDropdownToggle.getBoundingClientRect();
+startDateInput.onchange = () => {
+    if (!endDateInput.value){
+        return;
+    }
 
-    sourceDropdownMenu.style.position = 'absolute';
-    sourceDropdownMenu.style.top = rect.bottom + window.scrollY + 'px';
-    sourceDropdownMenu.style.left = rect.left + window.scrollX + 'px';
-    
-    sourceDropdownMenu.style.display = 'block';
+    if (endDateInput.value < startDateInput.value){
+        endDateInput.value = startDateInput.value;
+    }
 }
 
-function hideDropdownMenu(){
-    if (sourceDropdownMenu.style.display == 'block'){
-        sourceDropdownMenu.style.display = 'none';
-    }
+startTimeInput.onchange = () => {
 
-    let selectedCount = getSelectedSourceIds().length;
-    sourceDropdownToggle.innerHTML = `${selectedCount == 0 ? 'All' : selectedCount} Selected`
 }
 
-sourceDropdownToggle.addEventListener('click', () => {
-    if (sourceDropdownMenu.style.display == 'block'){
-        hideDropdownMenu();
+endDateInput.onchange = () => {
+    if (!startDateInput.value){
+        return;
     }
-    else{
-        showDropdownMenu();
-    }
-});
 
-sourceDropdownMenuItems.forEach(item => {
-    item.addEventListener('click', () => {
-        item.classList.toggle('selected');
-    });
-});
-
-document.addEventListener('click', (e) => {
-    if (!sourceDropdown.contains(e.target) && sourceDropdownMenu.style.display == 'block') {
-        hideDropdownMenu();
+    if (startDateInput.value > endDateInput.value){
+        startDateInput.value = endDateInput.value;
     }
-});
+}
+
+endTimeInput.onchange = () => {
+
+}
 
 loadInitialControlValues();
