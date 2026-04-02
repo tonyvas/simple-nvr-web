@@ -72,7 +72,6 @@ async function getPaginatedRecordings(sources=null, cursor=null, limit=null, old
         values.push(cursor.id);
     }
 
-    console.log(startDate, endDate, startTime, endTime)
     let dbDate = "STRFTIME('%Y-%m-%d', (start_ts-utc_offset)/1000, 'UNIXEPOCH')";
     let dbTime = "STRFTIME('%H-%M', (start_ts-utc_offset)/1000, 'UNIXEPOCH')";
 
@@ -103,7 +102,6 @@ async function getPaginatedRecordings(sources=null, cursor=null, limit=null, old
     let where = wheres.length > 0 ? `WHERE ${wheres.join(' AND ')}` : ''
     let sql = `SELECT * FROM recording ${where} ORDER BY start_ts ${order}, recording_id ${order} LIMIT ?`;
 
-    console.log(sql, values)
     let allSources = sources || await getSources();
     let rows = await db.query(sql, values);
     let recordings = rows.map(row => {

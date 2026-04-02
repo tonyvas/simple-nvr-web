@@ -12,11 +12,11 @@ router.use(async (err, req, res, next) => {
     let logger = req.app.locals.webLogger;
     
     if (err instanceof BadRequestError){
-        await logger.logError(`Bad request: ${err.message}`);
+        await logger.logInfo(`Bad request: ${err.message}`);
         res.status(400).render('error', { error: err.message });
     }
     else if (err instanceof NotFoundError){
-        await logger.logError(`Not found: ${err.message}`);
+        await logger.logInfo(`Not found: ${err.message}`);
         res.status(404).render('error', { error: err.message });
     }
     else{

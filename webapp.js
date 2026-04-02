@@ -6,12 +6,20 @@ const Logger = require('./logger')
 
 class Webapp{
     constructor(){
+        this._isSetup = false;
         this._isRunning = false;
 
-        this._setup();
+        this.app = null;
+        this.server = null;
     }
 
-    _setup(){
+    async init(){
+        if (this._isSetup){
+            throw new Error('Webapp is already initialized!');
+        }
+
+        this._isSetup = true;
+
         this.app = express();
         this.server = http.createServer(this.app);
 
@@ -20,8 +28,8 @@ class Webapp{
         this.app.use(express.json());
         this.app.use('/public', express.static(path.join(__dirname, 'public')))
 
-        let reqLogger = new Logger('requests.log');
-        let webLogger = new Logger('webapp.log');
+        let reqLogger = new Logger('requests', process.env.logLevel);
+        let webLogger = new Logger('webapp', process.env.logLevel);
 
         this.app.locals.webLogger = webLogger;
 
@@ -44,15 +52,24 @@ class Webapp{
                 return reject(new Error(`Webapp is already running!`));
             }
 
-            let port = process.env.PORT || DEFAULT_PORT;
-            this.server.listen(port, resolve);
+            if (!this._isSetup){
+                return reject(new Error(`Webapp is not yet initialized!`));
+            }
 
-            this._isRunning = true;
+            let port = process.env.PORT || DEFAULT_PORT;
+            this.server.listen(port, () => {
+                this._isRunning = true;
+                resolve();
+            });
         })
     }
 
     stop(){
         return new Promise((resolve, reject) => {
+            if (!this._isRunning){
+                resolve();
+            }
+
             this.server.close(err => {
                 if (err){
                     reject(new Error(`Failed to close server: ${err.message}`))

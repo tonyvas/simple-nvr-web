@@ -71,7 +71,6 @@ router.get('/:recording_id', async (req, res, next) => {
         let recording = await service.getRecordingById(id);
         let {next, prev} = await service.getRecordingNeighbors(recording);
         let related = await service.getRelatedRecordings(recording);
-        console.log(related)
 
         res.render('recording-details', { recording, next, prev, related, formatDate, formatTime, formatSize, formatBitrate});
     } catch (err) {

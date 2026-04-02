@@ -9,19 +9,41 @@ const DATABASE_PATH = path.join(__dirname, 'recordings.db');
 
 class DatabaseManager{
     constructor(dbPath){
-        this._db = new sqlite.DatabaseSync(dbPath);
-        this._logger = new Logger('db.log');
+        this._isSetup = false;
+        this._db = null;
+        this._logger = null;
+
+        this._dbPath = dbPath;
+    }
+
+    async init(){
+        if (this._isSetup){
+            throw new Error('Indexer is already initialized!');
+        }
+
+        this._isSetup = true;
+
+        this._db = new sqlite.DatabaseSync(this._dbPath);
+        this._logger = new Logger('db', process.env.logLevel);
     }
 
     async exec(sql){
+        if (!this._isSetup){
+            throw new Error(`DatabaseManager is not yet initialized!`);
+        }
+
         let start = Date.now();
         this._db.exec(sql);
         let end = Date.now();
 
-        await this._logger.logInfo(`Executed in ${end-start}ms`);
+        await this._logger.logDebug(`Executed in ${end-start}ms`);
     }
 
     async query(sql, values=null){
+        if (!this._isSetup){
+            throw new Error(`DatabaseManager is not yet initialized!`);
+        }
+
         // console.log(sql, values)
         let start = Date.now();
 
@@ -38,10 +60,10 @@ class DatabaseManager{
         let end = Date.now();
 
         if (rows.length == 0){
-            await this._logger.logInfo(`Queried in ${end-start}ms`);
+            await this._logger.logDebug(`Queried in ${end-start}ms`);
         }
         else{
-            await this._logger.logInfo(`Queried ${rows.length} rows in ${end-start}ms`);
+            await this._logger.logDebug(`Queried ${rows.length} rows in ${end-start}ms`);
         }
 
         return rows;

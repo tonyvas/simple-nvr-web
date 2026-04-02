@@ -23,17 +23,30 @@ const PART_SCAN_INTERVAL = Number(process.env.PART_SCAN_INTERVAL || DEFAULT_PART
 
 class Indexer{
     constructor(){
+        this._isSetup = false;
         this._isStarted = false;
         this._isScanning = false;
         this._scanHandle = null;
+    }
 
-        this._logger = new Logger('indexer.log');
+    async init(){
+        if (this._isSetup){
+            throw new Error('Indexer is already initialized!');
+        }
+
+        this._isSetup = true;
+
+        this._logger = new Logger('indexer', process.env.logLevel);
         this._plimit = pLimit(THUMB_MAX_BATCH);
     }
 
     async start(){
         if (this._isStarted){
             throw new Error('Cannot start indexer, already running!')
+        }
+
+        if (!this._isSetup){
+            throw new Error(`Indexer is not yet initialized!`);
         }
 
         try{
@@ -67,15 +80,25 @@ class Indexer{
                 let now = Date.now();
 
                 if ((now - lastFullScanTime) / 1000 >= FULL_SCAN_INTERVAL){
-                    await this._logger.logInfo('Running full scan!')
-                    await this._runFullScan();
                     lastFullScanTime = now;
                     lastPartScanTime = now;
+
+                    if (this._isScanning){
+                        await this._logger.logWarning('Cannot start full scan, scan still in process!');
+                    }
+
+                    await this._logger.logInfo('Running full scan!')
+                    await this._runFullScan();
                 }
                 else if ((now - lastPartScanTime) / 1000 >= PART_SCAN_INTERVAL){
+                    lastPartScanTime = now;
+
+                    if (this._isScanning){
+                        await this._logger.logWarning('Cannot start partial scan, scan still in process!');
+                    }
+
                     await this._logger.logInfo('Running partial scan!')
                     await this._runPartialScan();
-                    lastPartScanTime = now;
                 }
             }
             catch(err){
@@ -120,28 +143,33 @@ class Indexer{
 
         try{
             this._isScanning = true;
+            let numAdded = 0;
 
             let start = Date.now();
+
             for (let source of await this._getSourcesFromDatabase()){
                 let latestRecording = await this._getLatestRecording(source);
-                
                 let dateDirs = await this._listDirectory(path.join(source.path, 'videos'));
+
                 for (let dateDir of dateDirs.toSorted().toReversed()){
                     let datepath = path.join(source.path, 'videos', dateDir);
-
                     let videos = await this._listDirectory(datepath);
+
                     for (let video of videos.toSorted().toReversed()){
                         let [startMS, _] = this._parseRecordingTimestamp(video);
+
                         if (startMS > latestRecording.startTS){
                             let videoPath = path.join(datepath, video);
                             await this._addRecording(source, videoPath);
+
+                            numAdded++;
                         }
                     }
                 }
             }
 
             let end = Date.now();
-            await this._logger.logInfo(`Partial scan completed in ${end-start}ms!`);
+            await this._logger.logInfo(`Partial scan added ${numAdded} recordings in ${end-start}ms!`);
         }
         catch (error){
             throw error;
@@ -158,6 +186,8 @@ class Indexer{
 
         try{
             this._isScanning = true;
+            let numAdded = 0;
+            let numDeleted = 0;
 
             await this._updateSources();
             for (let source of await this._getSourcesFromDatabase()){
@@ -178,6 +208,7 @@ class Indexer{
                 for (let rpath of fsPaths){
                     if (dbPaths.indexOf(rpath) < 0){
                         tasks.push(this._plimit(() => this._addRecording(source, rpath)));
+                        numAdded++;
                     }
                 }
 
@@ -190,11 +221,12 @@ class Indexer{
                 for (let recording of dbRecordings){
                     if (fsPaths.indexOf(recording.videoPath) < 0){
                         await this._removeRecording(recording);
+                        numDeleted++;
                     }
                 }
 
                 let end = Date.now();
-                await this._logger.logInfo(`Full scan for source ID=${source.id} completed in ${end-start}ms!`);
+                await this._logger.logInfo(`Full scan for source ID=${source.id} added ${numAdded} and deleted ${numDeleted} recordings in ${end-start}ms!`);
             }
         }
         catch (error){
@@ -206,7 +238,7 @@ class Indexer{
     }
 
     async _addRecording(source, videoPath){
-        await this._logger.logInfo(`Adding recording at ${videoPath}`);
+        await this._logger.logDebug(`Adding recording at ${videoPath}`);
 
         let [startMS, offsetMS] = this._parseRecordingTimestamp(path.basename(videoPath));
         let thumbPath = path.join(THUMB_DIRPATH, source.name, `${startMS}.jpg`);
@@ -244,7 +276,7 @@ class Indexer{
     }
 
     async _removeRecording(recording){
-        await this._logger.logInfo(`Removing recording ID=${recording.id}`);
+        await this._logger.logDebug(`Removing recording ID=${recording.id}`);
 
         if (recording.thumbPath){
             try {
@@ -289,7 +321,7 @@ class Indexer{
      * @returns {void}
      */
     async _insertSourceIntoDatabase(source){
-        await this._logger.logInfo(`Inserting source ${source.name}`);
+        await this._logger.logDebug(`Inserting source ${source.name}`);
         let rows = await db.query("INSERT INTO source ('name', 'path') VALUES (?, ?) RETURNING source_id", [source.name, source.path]);
 
         return rows[0]['source_id'];
@@ -300,7 +332,7 @@ class Indexer{
      * @returns {void}
      */
     async _deleteSourceFromDatabase(source){
-        await this._logger.logInfo(`Deleting source ${source.name}`);
+        await this._logger.logDebug(`Deleting source ${source.name}`);
         await db.query('DELETE FROM source WHERE source_id=?', [source.id]);
     }
 
