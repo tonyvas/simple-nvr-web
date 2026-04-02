@@ -73,29 +73,25 @@ function loadInitialLimitControls(params){
 }
 
 function loadInitialRangeControls(params){
-    let afterDate = params.get(NEWER_THAN_DATE_PARAM);
-    let afterTime = params.get(NEWER_THAN_TIME_PARAM);
+    startDateInput.value = params.get(NEWER_THAN_DATE_PARAM);
+    endDateInput.value = params.get(OLDER_THAN_DATE_PARAM);
 
-    if (afterDate){
-        let date = new Date(Number(afterDate));
-        startDateInput.value = date.toISOString().split('T')[0];
+    let startTime = params.get(NEWER_THAN_TIME_PARAM);
+    startTimeInput.value = startTime ? startTime.replaceAll('-', ':') : '';
+
+    let endTime = params.get(OLDER_THAN_TIME_PARAM);
+    endTimeInput.value = endTime ? endTime.replaceAll('-', ':') : '';
+}
+
+function resetControlValues(){
+    for (let checkbox of sourceCheckboxes){
+        checkbox.checked = false;
     }
 
-    if (afterTime){
+    limitSelect.selectedIndex = 0;
+    startDateInput.value = endDateInput.value = startTimeInput.value = endTimeInput.value = '';
 
-    }
-
-    let beforeDate = params.get(OLDER_THAN_DATE_PARAM);
-    let beforeTime = params.get(OLDER_THAN_TIME_PARAM);
-    
-    if (beforeDate){
-        let date = new Date(Number(beforeDate) - 86400 + 1);
-        endDateInput.value = date.toISOString().split('T')[0];
-    }
-
-    if (beforeTime){
-
-    }
+    updateOnFilter();
 }
 
 function loadInitialControlValues(){
@@ -104,7 +100,7 @@ function loadInitialControlValues(){
 
     loadInitialSourceControls(params);
     loadInitialLimitControls(params);
-    // loadInitialRangeControls(params);
+    loadInitialRangeControls(params);
 }
 
 function getSelectedSourceIds(){
@@ -135,23 +131,31 @@ function updateLimitParams(params){
 
 function updateRangeParams(params){
     if (startDateInput.value){
-        let date = new Date(startDateInput.value);
-
-        params.set(NEWER_THAN_DATE_PARAM, date.getTime());
+        params.set(NEWER_THAN_DATE_PARAM, startDateInput.value);
     }
     else{
         params.delete(NEWER_THAN_DATE_PARAM);
     }
 
     if (endDateInput.value){
-        let date = new Date(endDateInput.value);
-        date.setDate(date.getDate() + 1);
-        date.setSeconds(date.getSeconds() - 1);
-
-        params.set(OLDER_THAN_DATE_PARAM, date.getTime());
+        params.set(OLDER_THAN_DATE_PARAM, endDateInput.value);
     }
     else{
         params.delete(OLDER_THAN_DATE_PARAM);
+    }
+
+    if (startTimeInput.value){
+        params.set(NEWER_THAN_TIME_PARAM, startTimeInput.value.replaceAll(':', '-'));
+    }
+    else{
+        params.delete(NEWER_THAN_TIME_PARAM);
+    }
+
+    if (endTimeInput.value){
+        params.set(OLDER_THAN_TIME_PARAM, endTimeInput.value.replaceAll(':', '-'));
+    }
+    else{
+        params.delete(OLDER_THAN_TIME_PARAM);
     }
 }
 
@@ -161,7 +165,7 @@ function updateOnFilter(){
 
     updateSourceParams(params);    
     updateLimitParams(params);
-    // updateRangeParams(params);
+    updateRangeParams(params);
 
     window.location = url;
 }

@@ -43,7 +43,7 @@ async function getRecordingById(recordingId){
  * @param {boolean} [olderDirection=null] 
  * @returns {{Recording[], Recording, Recording}}
  */
-async function getPaginatedRecordings(sources=null, cursor=null, limit=null, olderDirection=true, startDate=null, endDate=null){
+async function getPaginatedRecordings(sources=null, cursor=null, limit=null, olderDirection=true, startDate=null, endDate=null, startTime=null, endTime=null){
     const MAX_LIMIT = 100;
 
     let wheres = [];
@@ -72,14 +72,28 @@ async function getPaginatedRecordings(sources=null, cursor=null, limit=null, old
         values.push(cursor.id);
     }
 
+    console.log(startDate, endDate, startTime, endTime)
+    let dbDate = "STRFTIME('%Y-%m-%d', (start_ts-utc_offset)/1000, 'UNIXEPOCH')";
+    let dbTime = "STRFTIME('%H-%M', (start_ts-utc_offset)/1000, 'UNIXEPOCH')";
+
     if (startDate){
-        wheres.push('(start_ts - utc_offset) >= ?');
-        values.push(startDate.getTime());
+        wheres.push(`${dbDate} >= ?`);
+        values.push(startDate);
     }
 
     if (endDate){
-        wheres.push('(start_ts - utc_offset) <= ?');
-        values.push(endDate.getTime());
+        wheres.push(`${dbDate} <= ?`);
+        values.push(endDate);
+    }
+
+    if (startTime){
+        wheres.push(`${dbTime} >= ?`);
+        values.push(startTime);
+    }
+
+    if (endTime){
+        wheres.push(`${dbTime} <= ?`);
+        values.push(endTime);
     }
 
     limit = limit ? Math.min(limit, MAX_LIMIT) : MAX_LIMIT;
