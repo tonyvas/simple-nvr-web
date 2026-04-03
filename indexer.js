@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const pLimit = require('p-limit').default;
 
-const Logger = require('./logger');
+const loggerManager = require('./logger-manager');
 const { Source, Recording } = require('./models/models');
 
 const db = require('./database/db');
@@ -23,30 +23,17 @@ const PART_SCAN_INTERVAL = Number(process.env.PART_SCAN_INTERVAL || DEFAULT_PART
 
 class Indexer{
     constructor(){
-        this._isSetup = false;
         this._isStarted = false;
         this._isScanning = false;
         this._scanHandle = null;
-    }
 
-    async init(){
-        if (this._isSetup){
-            throw new Error('Indexer is already initialized!');
-        }
-
-        this._isSetup = true;
-
-        this._logger = new Logger('indexer', process.env.logLevel);
+        this._logger = loggerManager.newLogger('indexer');
         this._plimit = pLimit(THUMB_MAX_BATCH);
     }
 
     async start(){
         if (this._isStarted){
             throw new Error('Cannot start indexer, already running!')
-        }
-
-        if (!this._isSetup){
-            throw new Error(`Indexer is not yet initialized!`);
         }
 
         try{
@@ -84,20 +71,18 @@ class Indexer{
                     lastPartScanTime = now;
 
                     if (this._isScanning){
-                        await this._logger.logWarning('Cannot start full scan, scan still in process!');
+                        return await this._logger.logWarning('Cannot start full scan, scan still in process!');
                     }
 
-                    await this._logger.logInfo('Running full scan!')
                     await this._runFullScan();
                 }
                 else if ((now - lastPartScanTime) / 1000 >= PART_SCAN_INTERVAL){
                     lastPartScanTime = now;
 
                     if (this._isScanning){
-                        await this._logger.logWarning('Cannot start partial scan, scan still in process!');
+                        return await this._logger.logWarning('Cannot start partial scan, scan still in process!');
                     }
 
-                    await this._logger.logInfo('Running partial scan!')
                     await this._runPartialScan();
                 }
             }
@@ -142,6 +127,8 @@ class Indexer{
         }
 
         try{
+            await this._logger.logInfo('Starting partial scan!')
+
             this._isScanning = true;
             let numAdded = 0;
 
@@ -169,7 +156,7 @@ class Indexer{
             }
 
             let end = Date.now();
-            await this._logger.logInfo(`Partial scan added ${numAdded} recordings in ${end-start}ms!`);
+            await this._logger.logInfo(`Added ${numAdded} recordings in ${end-start}ms!`);
         }
         catch (error){
             throw error;
@@ -188,9 +175,11 @@ class Indexer{
             this._isScanning = true;
             let numAdded = 0;
             let numDeleted = 0;
-
+            
             await this._updateSources();
             for (let source of await this._getSourcesFromDatabase()){
+                await this._logger.logInfo(`Starting full scan for source ID=${source.id}!`)
+                
                 let start = Date.now();
                 let scanDirpath = path.join(source.path, 'videos');
 
@@ -226,7 +215,7 @@ class Indexer{
                 }
 
                 let end = Date.now();
-                await this._logger.logInfo(`Full scan for source ID=${source.id} added ${numAdded} and deleted ${numDeleted} recordings in ${end-start}ms!`);
+                await this._logger.logInfo(`Added ${numAdded} and deleted ${numDeleted} recordings in ${end-start}ms!`);
             }
         }
         catch (error){

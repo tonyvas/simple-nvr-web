@@ -2,23 +2,11 @@ const path = require('path')
 const http = require('http');
 const express = require('express');
 
-const Logger = require('./logger')
+const loggerManager = require('./logger-manager');
 
 class Webapp{
     constructor(){
-        this._isSetup = false;
         this._isRunning = false;
-
-        this.app = null;
-        this.server = null;
-    }
-
-    async init(){
-        if (this._isSetup){
-            throw new Error('Webapp is already initialized!');
-        }
-
-        this._isSetup = true;
 
         this.app = express();
         this.server = http.createServer(this.app);
@@ -28,8 +16,8 @@ class Webapp{
         this.app.use(express.json());
         this.app.use('/public', express.static(path.join(__dirname, 'public')))
 
-        let reqLogger = new Logger('requests', process.env.logLevel);
-        let webLogger = new Logger('webapp', process.env.logLevel);
+        let reqLogger = loggerManager.newLogger('requests');
+        let webLogger = loggerManager.newLogger('webapp');
 
         this.app.locals.webLogger = webLogger;
 
@@ -50,10 +38,6 @@ class Webapp{
         return new Promise((resolve, reject) => {
             if (this._isRunning){
                 return reject(new Error(`Webapp is already running!`));
-            }
-
-            if (!this._isSetup){
-                return reject(new Error(`Webapp is not yet initialized!`));
             }
 
             let port = process.env.PORT || DEFAULT_PORT;

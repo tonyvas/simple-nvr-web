@@ -3,35 +3,17 @@ const sqlite = require('node:sqlite');
 const fs = require('fs');
 const path = require('path');
 
-const Logger = require('../logger');
+const loggerManager = require('../logger-manager');
 
 const DATABASE_PATH = path.join(__dirname, 'recordings.db');
 
 class DatabaseManager{
     constructor(dbPath){
-        this._isSetup = false;
-        this._db = null;
-        this._logger = null;
-
-        this._dbPath = dbPath;
-    }
-
-    async init(){
-        if (this._isSetup){
-            throw new Error('Indexer is already initialized!');
-        }
-
-        this._isSetup = true;
-
-        this._db = new sqlite.DatabaseSync(this._dbPath);
-        this._logger = new Logger('db', process.env.logLevel);
+        this._db = new sqlite.DatabaseSync(dbPath);
+        this._logger = loggerManager.newLogger('db');
     }
 
     async exec(sql){
-        if (!this._isSetup){
-            throw new Error(`DatabaseManager is not yet initialized!`);
-        }
-
         let start = Date.now();
         this._db.exec(sql);
         let end = Date.now();
@@ -40,10 +22,6 @@ class DatabaseManager{
     }
 
     async query(sql, values=null){
-        if (!this._isSetup){
-            throw new Error(`DatabaseManager is not yet initialized!`);
-        }
-
         // console.log(sql, values)
         let start = Date.now();
 

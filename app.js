@@ -2,14 +2,10 @@
 
 require('dotenv').config();
 
-const Logger = require('./logger');
-
-let db = require('./database/db');
-let webapp = require('./webapp');
-let indexer = require('./indexer');
+const loggerManager = require('./logger-manager');
 
 function getLogLevel(){
-    const DEFAULT_LOG_LEVEL = Logger.LOG_LEVEL.INFO;
+    const DEFAULT_LOG_LEVEL = loggerManager.LOG_LEVELS.INFO;
     const CLI_KEY = '--log-level=';
 
     for (let arg of process.argv){
@@ -17,15 +13,15 @@ function getLogLevel(){
             let level = arg.substring(CLI_KEY.length).toLowerCase();
             switch (level) {
                 case 'critical':
-                    return Logger.LOG_LEVEL.CRITICAL;
+                    return loggerManager.LOG_LEVELS.CRITICAL;
                 case 'error':
-                    return Logger.LOG_LEVEL.ERROR;
+                    return loggerManager.LOG_LEVELS.ERROR;
                 case 'warning':
-                    return Logger.LOG_LEVEL.WARNING;
+                    return loggerManager.LOG_LEVELS.WARNING;
                 case 'info':
-                    return Logger.LOG_LEVEL.INFO;
+                    return loggerManager.LOG_LEVELS.INFO;
                 case 'debug':
-                    return Logger.LOG_LEVEL.DEBUG;
+                    return loggerManager.LOG_LEVELS.DEBUG;
                 default:
                     throw new Error(`Unknown log level: ${level}`);
             }
@@ -36,21 +32,19 @@ function getLogLevel(){
 }
 
 function main(){
-    process.env.logLevel = getLogLevel();
-    console.log(`Running with log level: ${process.env.logLevel}`);
-
-    let logger = new Logger('main', process.env.logLevel);
+    let logLevel = getLogLevel();
+    loggerManager.setLogLevel(logLevel);
+    Object.entries(loggerManager.LOG_LEVELS).forEach(([k, v]) => {
+        if (logLevel == v){
+            console.log(`Running with log level: ${k}`);
+        }
+    })
+    
+    let logger = loggerManager.newLogger('main');
+    let webapp = require('./webapp');
+    let indexer = require('./indexer');
 
     let start = async () => {
-        await logger.logInfo('Setting up database manager!');
-        await db.init();
-
-        await logger.logInfo('Setting up indexer!');
-        await indexer.init();
-
-        await logger.logInfo('Setting up webapp!');
-        await webapp.init();
-
         await logger.logInfo('Starting webapp!');
         await webapp.start();
 
