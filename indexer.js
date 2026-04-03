@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const pLimit = require('p-limit').default;
+const PQueue = require('p-queue').default;
 
 const loggerManager = require('./logger-manager');
 const { Source, Recording } = require('./models/models');
@@ -12,12 +12,12 @@ const DEFAULT_FULL_SCAN_INTERVAL = 300;
 const DEFAULT_PART_SCAN_INTERVAL = 30;
 
 const DEFAULT_THUMB_DIRPATH = path.join(__dirname, 'thumbs');
-const DEFAULT_THUMB_MAX_BATCH = 10;
+const DEFAULT_MAX_CONCURRENCY = 10;
 
 const NVR_STORAGE_DIRPATH = path.resolve(process.env.NVR_STORAGE_DIRPATH);
 const THUMB_DIRPATH = path.resolve(process.env.THUMB_STORAGE_DIRPATH || DEFAULT_THUMB_DIRPATH);
 
-const THUMB_MAX_BATCH = Number(process.env.THUMB_MAX_BATCH || DEFAULT_THUMB_MAX_BATCH);
+const MAX_CONCURRENCY = Number(process.env.MAX_CONCURRENCY || DEFAULT_MAX_CONCURRENCY);
 const FULL_SCAN_INTERVAL = Number(process.env.FULL_SCAN_INTERVAL || DEFAULT_FULL_SCAN_INTERVAL);
 const PART_SCAN_INTERVAL = Number(process.env.PART_SCAN_INTERVAL || DEFAULT_PART_SCAN_INTERVAL);
 
@@ -28,7 +28,7 @@ class Indexer{
         this._scanHandle = null;
 
         this._logger = loggerManager.newLogger('indexer');
-        this._plimit = pLimit(THUMB_MAX_BATCH);
+        this._pqueue = new PQueue({ concurrency: MAX_CONCURRENCY });
     }
 
     async start(){
@@ -147,12 +147,15 @@ class Indexer{
 
                         if (startMS > latestRecording.startTS){
                             let videoPath = path.join(datepath, video);
-                            await this._addRecording(source, videoPath);
+                            this._pqueue.add(() => this._addRecording(source, videoPath));
+                            // await this._addRecording(source, videoPath)
 
                             numAdded++;
                         }
                     }
                 }
+
+                await this._pqueue.onIdle();
             }
 
             let end = Date.now();
@@ -173,8 +176,6 @@ class Indexer{
 
         try{
             this._isScanning = true;
-            let numAdded = 0;
-            let numDeleted = 0;
             
             await this._updateSources();
             for (let source of await this._getSourcesFromDatabase()){
@@ -182,6 +183,8 @@ class Indexer{
                 
                 let start = Date.now();
                 let scanDirpath = path.join(source.path, 'videos');
+                let numAdded = 0;
+                let numDeleted = 0;
 
                 let fsPaths = [];
                 for (let relpath of await this._listDirectory(scanDirpath, true)){
@@ -193,18 +196,12 @@ class Indexer{
                 let dbRecordings = await this._getRecordingsOfSourceFromDatabase(source);
                 let dbPaths = dbRecordings.map(r => r.videoPath);
 
-                let tasks = [];
                 for (let rpath of fsPaths){
                     if (dbPaths.indexOf(rpath) < 0){
-                        tasks.push(this._plimit(() => this._addRecording(source, rpath)));
+                        this._pqueue.add(() => this._addRecording(source, rpath));
+                        // await this._addRecording(source, rpath)
                         numAdded++;
                     }
-                }
-
-                try {
-                    await Promise.all(tasks)
-                } catch (error) {
-                    throw new Error(`Failed to add recordings: ${error.message}`)
                 }
 
                 for (let recording of dbRecordings){
@@ -213,6 +210,8 @@ class Indexer{
                         numDeleted++;
                     }
                 }
+
+                await this._pqueue.onIdle();
 
                 let end = Date.now();
                 await this._logger.logInfo(`Added ${numAdded} and deleted ${numDeleted} recordings in ${end-start}ms!`);
@@ -229,10 +228,14 @@ class Indexer{
     async _addRecording(source, videoPath){
         await this._logger.logDebug(`Adding recording at ${videoPath}`);
 
+        let a = Date.now();
+        
         let [startMS, offsetMS] = this._parseRecordingTimestamp(path.basename(videoPath));
         let thumbPath = path.join(THUMB_DIRPATH, source.name, `${startMS}.jpg`);
 
         let metadata = await utils.getMetadata(videoPath);
+
+        let b = Date.now();
         
         let bitrate = metadata.format.bit_rate;
         let duration = Math.round(metadata.format.duration);
@@ -257,11 +260,17 @@ class Indexer{
             throw new Error(`Failed to insert recording into database: ${error.message}`);
         }
 
+        let c = Date.now();
+
         try {
             await utils.generateThumbnail(videoPath, thumbPath);
         } catch (error) {
             await this._logger.logWarning(`Failed to generate thumbnail: ${error.message}`);
         }
+
+        let d = Date.now();
+
+        console.log(`Metadata: ${b-a}ms, Insert: ${c-b}ms, Thumbnail: ${d-c}ms`);
     }
 
     async _removeRecording(recording){
