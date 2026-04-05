@@ -143,14 +143,17 @@ class Indexer{
                     let videos = await this._listDirectory(datepath);
 
                     for (let video of videos.toSorted().toReversed()){
-                        let [startMS, _] = this._parseRecordingTimestamp(video);
+                        try {
+                            let [startMS, _] = this._parseRecordingTimestamp(video);
 
-                        if (startMS > latestRecording.startTS){
-                            let videoPath = path.join(datepath, video);
-                            this._pqueue.add(() => this._addRecording(source, videoPath));
-                            // await this._addRecording(source, videoPath)
+                            if (startMS > latestRecording.startTS){
+                                let videoPath = path.join(datepath, video);
+                                this._pqueue.add(() => this._addRecording(source, videoPath));
 
-                            numAdded++;
+                                numAdded++;
+                            }
+                        } catch (error) {
+                            await this._logger.logError(`Failed to add recording: ${error.message}`);
                         }
                     }
                 }
@@ -197,17 +200,24 @@ class Indexer{
                 let dbPaths = dbRecordings.map(r => r.videoPath);
 
                 for (let rpath of fsPaths){
-                    if (dbPaths.indexOf(rpath) < 0){
-                        this._pqueue.add(() => this._addRecording(source, rpath));
-                        // await this._addRecording(source, rpath)
-                        numAdded++;
+                    try {
+                        if (dbPaths.indexOf(rpath) < 0){
+                            this._pqueue.add(() => this._addRecording(source, rpath));
+                            numAdded++;
+                        }
+                    } catch (error) {
+                        await this._logger.logError(`Failed to add recording: ${error.message}`);
                     }
                 }
 
                 for (let recording of dbRecordings){
-                    if (fsPaths.indexOf(recording.videoPath) < 0){
-                        await this._removeRecording(recording);
-                        numDeleted++;
+                    try {
+                        if (fsPaths.indexOf(recording.videoPath) < 0){
+                            await this._removeRecording(recording);
+                            numDeleted++;
+                        }
+                    } catch (error) {
+                        await this._logger.logError(`Failed to remove recording: ${error.message}`);
                     }
                 }
 
@@ -227,15 +237,15 @@ class Indexer{
 
     async _addRecording(source, videoPath){
         await this._logger.logDebug(`Adding recording at ${videoPath}`);
-
-        let a = Date.now();
         
+        let perfTotalStart = Date.now();
+
         let [startMS, offsetMS] = this._parseRecordingTimestamp(path.basename(videoPath));
         let thumbPath = path.join(THUMB_DIRPATH, source.name, `${startMS}.jpg`);
 
+        let perfMetaStart = Date.now();
         let metadata = await utils.getMetadata(videoPath);
-
-        let b = Date.now();
+        let perfMetaTime = Date.now() - perfMetaStart;
         
         let bitrate = metadata.format.bit_rate;
         let duration = Math.round(metadata.format.duration);
@@ -254,23 +264,24 @@ class Indexer{
 
         let recording = new Recording(null, source, startMS, offsetMS, videoPath, thumbPath, duration, size, bitrate, videoCodec, audioCodec);
         
+        let perfInsertStart = Date.now();
         try {
-            recording.id = await this._insertRecordingIntoDatabase(recording);
+            recording.id = await this._insertRecordingIntoDatabase(recording);    
         } catch (error) {
             throw new Error(`Failed to insert recording into database: ${error.message}`);
         }
+        let perfInsertTime = Date.now() - perfInsertStart;
 
-        let c = Date.now();
-
+        let perfThumbStart = Date.now();
         try {
             await utils.generateThumbnail(videoPath, thumbPath);
         } catch (error) {
             await this._logger.logWarning(`Failed to generate thumbnail: ${error.message}`);
         }
+        let perfThumbTime = Date.now() - perfThumbStart;
+        let perfTotalTime = Date.now() - perfTotalStart;
 
-        let d = Date.now();
-
-        console.log(`Metadata: ${b-a}ms, Insert: ${c-b}ms, Thumbnail: ${d-c}ms`);
+        await this._logger.logDebug(`Added recording in ${perfTotalTime}ms (metadata: ${perfMetaTime}ms, insert: ${perfInsertTime}ms, thumbnail: ${perfThumbTime})`);
     }
 
     async _removeRecording(recording){
