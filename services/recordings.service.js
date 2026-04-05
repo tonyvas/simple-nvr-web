@@ -44,6 +44,8 @@ async function getRecordingById(recordingId){
  * @returns {{Recording[], Recording, Recording}}
  */
 async function getPaginatedRecordings(sources=null, cursor=null, limit=null, olderDirection=true, startDate=null, endDate=null, startTime=null, endTime=null){
+    const DB_DATE_FORMULA = "STRFTIME('%Y-%m-%d', (start_ts-utc_offset)/1000, 'UNIXEPOCH')";
+    const DB_TIME_FORMULA = "STRFTIME('%H-%M', (start_ts-utc_offset)/1000, 'UNIXEPOCH')";
     const MAX_LIMIT = 100;
 
     let wheres = [];
@@ -72,27 +74,39 @@ async function getPaginatedRecordings(sources=null, cursor=null, limit=null, old
         values.push(cursor.id);
     }
 
-    let dbDate = "STRFTIME('%Y-%m-%d', (start_ts-utc_offset)/1000, 'UNIXEPOCH')";
-    let dbTime = "STRFTIME('%H-%M', (start_ts-utc_offset)/1000, 'UNIXEPOCH')";
+    if (startDate || endDate){
+        // If a date bound is given, filter using datetime bounds
 
-    if (startDate){
-        wheres.push(`${dbDate} >= ?`);
-        values.push(startDate);
+        if (startDate){
+            // Include start bound
+            wheres.push(`(${DB_DATE_FORMULA},${DB_TIME_FORMULA}) >= (?,?)`);
+
+            values.push(startDate);
+            values.push(startTime || '00-00');  // Assume time is midnight by default
+        }
+
+        if (endDate){
+            // Exclude end bound
+            wheres.push(`(${DB_DATE_FORMULA},${DB_TIME_FORMULA}) < (?,?)`);
+            
+            values.push(endDate);
+            values.push(endTime || '00-00');  // Assume time is midnight by default (same as <= previous date)
+        }
     }
+    else if (startTime || endTime){
+        // If only time bounds given, filter only using time, ignore date
+        
+        if (startTime){
+            // Include start
+            wheres.push(`${DB_TIME_FORMULA} >= ?`);
+            values.push(startTime);
+        }
 
-    if (endDate){
-        wheres.push(`${dbDate} <= ?`);
-        values.push(endDate);
-    }
-
-    if (startTime){
-        wheres.push(`${dbTime} >= ?`);
-        values.push(startTime);
-    }
-
-    if (endTime){
-        wheres.push(`${dbTime} <= ?`);
-        values.push(endTime);
+        if (endTime){
+            // Exclude end
+            wheres.push(`${DB_TIME_FORMULA} < ?`);
+            values.push(endTime);
+        }
     }
 
     limit = limit ? Math.min(limit, MAX_LIMIT) : MAX_LIMIT;

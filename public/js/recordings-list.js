@@ -32,12 +32,6 @@ function goLatestPage(){
     params.delete(NEWER_THAN_CURSOR_PARAM);
     params.delete(OLDER_THAN_CURSOR_PARAM);
 
-    params.delete(NEWER_THAN_DATE_PARAM);
-    params.delete(NEWER_THAN_TIME_PARAM);
-
-    params.delete(OLDER_THAN_DATE_PARAM);
-    params.delete(OLDER_THAN_TIME_PARAM);
-
     window.location = url;
 }
 
@@ -81,17 +75,6 @@ function loadInitialRangeControls(params){
 
     let endTime = params.get(OLDER_THAN_TIME_PARAM);
     endTimeInput.value = endTime ? endTime.replaceAll('-', ':') : '';
-}
-
-function resetControlValues(){
-    for (let checkbox of sourceCheckboxes){
-        checkbox.checked = false;
-    }
-
-    limitSelect.selectedIndex = 0;
-    startDateInput.value = endDateInput.value = startTimeInput.value = endTimeInput.value = '';
-
-    updateOnFilter();
 }
 
 function loadInitialControlValues(){
@@ -167,35 +150,44 @@ function updateOnFilter(){
     updateLimitParams(params);
     updateRangeParams(params);
 
+    // params.delete(OLDER_THAN_CURSOR_PARAM);
+    // params.delete(NEWER_THAN_CURSOR_PARAM);
+
     window.location = url;
 }
 
 startDateInput.onchange = () => {
-    if (!endDateInput.value){
+    if (!startDateInput.value){
+        // If input cleared
         return;
     }
 
+    if (!endDateInput.value){
+        // If end not set
+        return;
+    }
+
+    // Make sure end date isn't before start
     if (endDateInput.value < startDateInput.value){
         endDateInput.value = startDateInput.value;
     }
 }
 
-startTimeInput.onchange = () => {
-
-}
-
 endDateInput.onchange = () => {
-    if (!startDateInput.value){
+    if (!endDateInput.value){
+        // If input cleared
         return;
     }
 
+    if (!startDateInput.value){
+        // If start not set
+        return;
+    }
+
+    // Make sure start is not after end
     if (startDateInput.value > endDateInput.value){
         startDateInput.value = endDateInput.value;
     }
-}
-
-endTimeInput.onchange = () => {
-
 }
 
 loadInitialControlValues();

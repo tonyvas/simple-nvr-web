@@ -22,21 +22,22 @@
 
 <div class="control_item" id="range_start_controls">
     <h3>Start</h3>
-    <div class="date_time_inputs">
+    <form class="date_time_inputs">
         <input type="date" class="date_input">
         <input type="time" class="time_input">
-    </div>
+        <input type="reset" value="Reset">
+    </form>
 </div>
 
 <div class="control_item" id="range_end_controls">
     <h3>End</h3>
-    <div class="date_time_inputs">
+    <form class="date_time_inputs">
         <input type="date" class="date_input">
         <input type="time" class="time_input">
-    </div>
+        <input type="reset" value="Reset">
+    </form>
 </div>
 
 <div class="control_item" id="update_control">
-    <button onclick="resetControlValues();">Reset</button>
     <button onclick="updateOnFilter();">Update</button>
 </div>
