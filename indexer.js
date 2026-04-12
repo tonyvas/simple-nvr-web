@@ -8,6 +8,9 @@ const { Source, Recording } = require('./models/models');
 const db = require('./database/db');
 const utils = require('./utils');
 
+const VIDEO_FILE_EXTENSION = '.mp4';
+const THUMB_FILE_EXTENSION = '.jpg';
+
 const DEFAULT_FULL_SCAN_INTERVAL = 300;
 const DEFAULT_PART_SCAN_INTERVAL = 30;
 
@@ -143,6 +146,11 @@ class Indexer{
                     let videos = await this._listDirectory(datepath);
 
                     for (let video of videos.toSorted().toReversed()){
+                        if (!video.endsWith(VIDEO_FILE_EXTENSION)){
+                            // Skip non-video files
+                            continue;
+                        }
+                        
                         try {
                             let [startMS, _] = this._parseRecordingTimestamp(video);
 
@@ -191,7 +199,7 @@ class Indexer{
 
                 let fsPaths = [];
                 for (let relpath of await this._listDirectory(scanDirpath, true)){
-                    if (path.basename(relpath).endsWith('.mp4')){
+                    if (path.basename(relpath).endsWith(VIDEO_FILE_EXTENSION)){
                         fsPaths.push(path.resolve(scanDirpath, relpath))
                     }
                 }
@@ -239,20 +247,17 @@ class Indexer{
         await this._logger.logDebug(`Adding recording at ${videoPath}`);
         
         let perfTotalStart = Date.now();
-
         let [startMS, offsetMS] = this._parseRecordingTimestamp(path.basename(videoPath));
-        let thumbPath = path.join(THUMB_DIRPATH, source.name, `${startMS}.jpg`);
-
+        
         let perfMetaStart = Date.now();
         let metadata = await utils.getMetadata(videoPath);
-        let perfMetaTime = Date.now() - perfMetaStart;
-        
+
         let bitrate = metadata.format.bit_rate;
         let duration = Math.round(metadata.format.duration);
         let size = metadata.format.size;
         let audioCodec = null;
         let videoCodec = null;
-
+        
         for (let stream of metadata.streams){
             if (stream.codec_type == 'video'){
                 videoCodec = stream.codec_name;
@@ -260,6 +265,16 @@ class Indexer{
             else if (stream.codec_type == 'audio'){
                 audioCodec = stream.codec_name;
             }
+        }
+
+        let perfMetaTime = Date.now() - perfMetaStart;
+        
+        // Assume NVR created thumbnail
+        let thumbPath = videoPath.replace(VIDEO_FILE_EXTENSION, THUMB_FILE_EXTENSION);
+
+        // If it didn't, create one in thumbnail storage directory
+        if (!fs.existsSync(thumbPath)){
+            thumbPath = path.join(THUMB_DIRPATH, source.name, `${startMS}.${THUMB_FILE_EXTENSION}`);
         }
 
         let recording = new Recording(null, source, startMS, offsetMS, videoPath, thumbPath, duration, size, bitrate, videoCodec, audioCodec);
@@ -274,7 +289,10 @@ class Indexer{
 
         let perfThumbStart = Date.now();
         try {
-            await utils.generateThumbnail(videoPath, thumbPath);
+            if (thumbPath.startsWith(THUMB_DIRPATH)){
+                // Create thumbnail if needed
+                await utils.generateThumbnail(videoPath, thumbPath);
+            }
         } catch (error) {
             await this._logger.logWarning(`Failed to generate thumbnail: ${error.message}`);
         }
