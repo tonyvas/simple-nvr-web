@@ -274,7 +274,7 @@ class Indexer{
 
         // If it didn't, create one in thumbnail storage directory
         if (!fs.existsSync(thumbPath)){
-            thumbPath = path.join(THUMB_DIRPATH, source.name, `${startMS}.${THUMB_FILE_EXTENSION}`);
+            thumbPath = path.join(THUMB_DIRPATH, source.name, `${startMS}${THUMB_FILE_EXTENSION}`);
         }
 
         let recording = new Recording(null, source, startMS, offsetMS, videoPath, thumbPath, duration, size, bitrate, videoCodec, audioCodec);
