@@ -141,6 +141,8 @@ class Indexer{
                 let latestRecording = await this._getLatestRecording(source);
                 let dateDirs = await this._listDirectory(path.join(source.path, 'videos'));
 
+                let promises = [];
+
                 for (let dateDir of dateDirs.toSorted().toReversed()){
                     let datepath = path.join(source.path, 'videos', dateDir);
                     let videos = await this._listDirectory(datepath);
@@ -151,22 +153,25 @@ class Indexer{
                             continue;
                         }
                         
-                        try {
-                            let [startMS, _] = this._parseRecordingTimestamp(video);
+                        let [startMS, _] = this._parseRecordingTimestamp(video);
 
-                            if (startMS > latestRecording.startTS){
-                                let videoPath = path.join(datepath, video);
-                                this._pqueue.add(() => this._addRecording(source, videoPath));
+                        if (startMS > latestRecording.startTS){
+                            let videoPath = path.join(datepath, video);
+                            let prom = this._pqueue.add(async () => {
+                                try {
+                                    await this._addRecording(source, videoPath)
+                                    numAdded++;
+                                } catch (error) {
+                                    await this._logger.logError(`Failed to add recording at ${videoPath}: ${error.message}`);
+                                }
+                            })
 
-                                numAdded++;
-                            }
-                        } catch (error) {
-                            await this._logger.logError(`Failed to add recording: ${error.message}`);
+                            promises.push(prom);
                         }
                     }
                 }
 
-                await this._pqueue.onIdle();
+                await Promise.all(promises);
             }
 
             let end = Date.now();
@@ -207,16 +212,23 @@ class Indexer{
                 let dbRecordings = await this._getRecordingsOfSourceFromDatabase(source);
                 let dbPaths = dbRecordings.map(r => r.videoPath);
 
+                let promises = [];
                 for (let rpath of fsPaths){
-                    try {
-                        if (dbPaths.indexOf(rpath) < 0){
-                            this._pqueue.add(() => this._addRecording(source, rpath));
-                            numAdded++;
-                        }
-                    } catch (error) {
-                        await this._logger.logError(`Failed to add recording: ${error.message}`);
+                    if (dbPaths.indexOf(rpath) < 0){
+                        let prom = this._pqueue.add(async () => {
+                            try {
+                                await this._addRecording(source, rpath)
+                                numAdded++;
+                            } catch (error) {
+                                await this._logger.logError(`Failed to add recording at ${rpath}: ${error.message}`);
+                            }
+                        });
+
+                        promises.push(prom);
                     }
                 }
+
+                await Promise.all(promises);
 
                 for (let recording of dbRecordings){
                     try {
@@ -228,8 +240,6 @@ class Indexer{
                         await this._logger.logError(`Failed to remove recording: ${error.message}`);
                     }
                 }
-
-                await this._pqueue.onIdle();
 
                 let end = Date.now();
                 await this._logger.logInfo(`Added ${numAdded} and deleted ${numDeleted} recordings in ${end-start}ms!`);
@@ -252,9 +262,9 @@ class Indexer{
         let perfMetaStart = Date.now();
         let metadata = await utils.getMetadata(videoPath);
 
-        let bitrate = metadata.format.bit_rate;
-        let duration = Math.round(metadata.format.duration);
-        let size = metadata.format.size;
+        let bitrate = metadata.format.bit_rate ? Number(metadata.format.bit_rate) : null;
+        let duration = metadata.format.duration ? Math.round(metadata.format.duration) : null;
+        let size = metadata.format.size ? Number(metadata.format.size) : null;
         let audioCodec = null;
         let videoCodec = null;
         
@@ -294,7 +304,8 @@ class Indexer{
                 await utils.generateThumbnail(videoPath, thumbPath);
             }
         } catch (error) {
-            await this._logger.logWarning(`Failed to generate thumbnail: ${error.message}`);
+            await this._logger.logWarning(`Failed to generate thumbnail for ${videoPath}`);
+            await this._logger.logDebug(`Thumbnail error: ${error.message}`);
         }
         let perfThumbTime = Date.now() - perfThumbStart;
         let perfTotalTime = Date.now() - perfTotalStart;
